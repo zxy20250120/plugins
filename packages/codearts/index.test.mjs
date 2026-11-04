@@ -199,8 +199,45 @@ test("parseModelInfo drops vision models, dedupes, and fills context", () => {
 test("parseModelInfo keeps the dated id, and its bare form as another model", () => {
   const seen = new Set()
   const dated = x.parseModelInfo({ model_id: "deepseek-v4-flash-0731", model_name: "deepseek-v4-flash-0731", max_tokens: 131072 }, seen)
-  assert.deepEqual(dated, { id: "deepseek-v4-flash-0731", name: "deepseek-v4-flash", context: 1048576, output: x.MAX_OUTPUT_TOKENS })
-  assert.equal(x.parseModelInfo({ model_id: "deepseek-v4-flash" }, seen).id, "deepseek-v4-flash")
+  assert.deepEqual(dated, { id: "deepseek-v4-flash-0731", name: "deepseek-v4-flash-0731", context: 1048576, output: x.MAX_OUTPUT_TOKENS })
+  const bare = x.parseModelInfo({ model_id: "deepseek-v4-flash" }, seen)
+  assert.equal(bare.id, "deepseek-v4-flash")
+  assert.notEqual(bare.name, dated.name)
+})
+
+// #677 (errorcode7): /v1/model/builtin lists deepseek-v4.1-flash and
+// deepseek-v4.1-flash-1017 side by side, two models with other off-peak
+// rates. Each keeps the name the vendor gives it.
+test("a dated builtin model keeps its own name beside its bare form (#677)", async () => {
+  const builtin = {
+    builtinModels: [
+      { model_id: "deepseek-v4.1-flash", model_name: "DeepSeek-V4.1-Flash", model_desc: "【限时体验】能力更高, 速度更快" },
+      { model_id: "deepseek-v4.1-flash-1017", model_name: "DeepSeek-V4.1-Flash-1017", model_desc: "【限时体验】许愿式编程一键成真" },
+    ],
+  }
+  const fetcher = async (url) => String(url).includes("opengw")
+    ? new Response(JSON.stringify({ result: { models: [] } }), { status: 200 })
+    : new Response(JSON.stringify(builtin), { status: 200 })
+  const models = await x.fetchRemoteModels(signedCred, fetcher)
+  assert.deepEqual(models.map((m) => [m.id, m.name]), [
+    ["deepseek-v4.1-flash", "DeepSeek-V4.1-Flash"],
+    ["deepseek-v4.1-flash-1017", "DeepSeek-V4.1-Flash-1017"],
+  ])
+})
+
+test("a dated model only the agent lists keeps its date, named or not (#677)", async () => {
+  const detail = {
+    gpts: {
+      models: [
+        { model_name: "DeepSeek-V4.1-Flash-1017", model_parameters: { model_id: "deepseek-v4.1-flash-1017" }, credit: [{ ratio: 0.0486, ratio_display: "0.18" }] },
+        { model_parameters: { model_id: "deepseek-v4.1-flash-0930" } },
+      ],
+    },
+  }
+  const models = await x.fetchRemoteModels(signedCred, modelsFetcher([], { agents: agentList, detail }))
+  const names = Object.fromEntries(models.map((m) => [m.id, m.name]))
+  assert.equal(names["deepseek-v4.1-flash-1017"], "DeepSeek-V4.1-Flash-1017")
+  assert.equal(names["deepseek-v4.1-flash-0930"], "Deepseek V4.1 Flash 0930")
 })
 
 test("prepareChatBody reshapes a chat into what the gateway accepts and meters", () => {
@@ -215,6 +252,42 @@ test("prepareChatBody reshapes a chat into what the gateway accepts and meters",
   assert.equal(x.prepareChatBody({ model: "GLM-5.2", messages: [] }, { thinking: false }).body.thinking, undefined)
   assert.equal(x.prepareChatBody({ model: "GLM-5.2" }), null)
   assert.equal(x.prepareChatBody(null), null)
+})
+
+// The caller's level is the gateway's own (measured 2026-11-03: none, low,
+// medium, high, xhigh and max are accepted, every other value is a 400), and a
+// level that was named is passed on as it is: `thinking: enabled` would
+// overrule it. "No thinking" is the switch, not the level: `reasoning_effort:
+// none` alone still thought (89 to 135 characters of it).
+test("the caller's reasoning level is the model's own", () => {
+  // A level the model takes is passed on as it is: `thinking: enabled` would
+  // overrule it.
+  for (const level of ["low", "medium", "high", "xhigh", "max"]) {
+    const out = x.prepareChatBody({ model: "deepseek-v4.1-flash-1017", messages: [], reasoning_effort: level })
+    assert.equal(out.body.reasoning_effort, level)
+    assert.equal(out.body.thinking, undefined, level + " is the level; nothing else is asked")
+  }
+
+  // A host's word for no thinking is the gateway's way of not thinking.
+  for (const word of ["off", "disabled", "none"]) {
+    const out = x.prepareChatBody({ model: "deepseek-v4.1-flash-1017", messages: [], reasoning_effort: word })
+    assert.deepEqual(out.body.thinking, { type: "disabled" }, word + " means no thinking")
+    assert.equal("reasoning_effort" in out.body, false, "the level would only be a hint")
+  }
+
+  // A level the model does not take would turn the whole request away (a 400),
+  // so it is dropped and the request goes as the model serves it.
+  const notTaken = x.prepareChatBody({ model: "glm-5.3-flash", messages: [], reasoning_effort: "medium" })
+  assert.equal("reasoning_effort" in notTaken.body, false, "glm-5.3-flash takes no medium")
+  assert.deepEqual(x.prepareChatBody({ model: "glm-5.3-flash", messages: [], reasoning_effort: "high" }).body.reasoning_effort, "high")
+
+  // A word no model takes is dropped as well.
+  assert.equal("reasoning_effort" in x.prepareChatBody({ model: "deepseek-v4.1-flash-1017", messages: [], reasoning_effort: "loud" }).body, false)
+
+  // A caller that said nothing still gets the thinking, as before.
+  assert.deepEqual(x.prepareChatBody({ model: "deepseek-v4.1-flash-1017", messages: [] }).body.thinking, { type: "enabled" })
+  // A caller that said so itself is not overruled.
+  assert.deepEqual(x.prepareChatBody({ model: "deepseek-v4.1-flash-1017", messages: [], thinking: { type: "disabled" } }).body.thinking, { type: "disabled" })
 })
 
 // The free model's TPM limit, word for word as the gateway sent it in a 200.
@@ -1938,6 +2011,42 @@ test("provider.models: free models once claimed, rates and parameters from the C
   await plugin.provider.models(provider, { auth: makeAuth(cred) })
   assert.equal(seen.filter((s) => s.url === x.BENEFIT_CLAIM_URL).length, 1)
   assert.equal(seen.filter((s) => s.url === x.AGENT_LIST_URL).length, 1)
+})
+
+// A model that reasons is told so, with the levels it takes: without them the
+// host has no row for the thinking and renders the reasoning text as the answer
+// (measured 2026-11-03 on a DSH host: the caller's own thinking showed up
+// where the reply should have been).
+//
+// The levels go in the model row's `variants` — their keys are the levels, and
+// magpie reads them as the model's levels (internal/provider/plugins.go:
+// `c.Efforts, c.Reasoning = m.Variants, true`).
+test("provider.models: a model that reasons is given the levels it takes", async () => {
+  const cred = await makeCred()
+  const plugin = await CodeArtsAuthPlugin({ client: {} }, { fetch: modelsFetcher([], { agents: agentList, detail: agentDetail }) })
+  const models = await plugin.provider.models({ models: {} }, { auth: makeAuth(cred) })
+
+  const thinking = models["GLM-5.2"]
+  assert.equal(thinking.capabilities.reasoning, true)
+  assert.deepEqual(Object.keys(thinking.variants), ["none", "low", "medium", "high", "xhigh", "max"])
+  assert.deepEqual(thinking.variants.low, { reasoningEffort: "low" })
+
+  // A model measured to think is said to, whatever the vendor's own list says
+  // of it (the vendor names no level for any of them).
+  assert.deepEqual(Object.keys(models["glm-5.3"].variants), ["none", "low", "medium", "high", "xhigh", "max"])
+
+  // A model of no measured level offers none: the host then asks for no
+  // thinking at all.
+  assert.equal(models["deepseek-v4-flash-0731"].capabilities.reasoning, undefined)
+  assert.equal(models["deepseek-v4-flash-0731"].variants, undefined)
+})
+
+test("provider.models: a caller's own variants stand", async () => {
+  const cred = await makeCred()
+  const plugin = await CodeArtsAuthPlugin({ client: {} }, { fetch: modelsFetcher([], { agents: agentList, detail: agentDetail }) })
+  const provider = { models: { "GLM-5.2": { variants: { low: { reasoningEffort: "low" }, high: { reasoningEffort: "high" } } } } }
+  const models = await plugin.provider.models(provider, { auth: makeAuth(cred) })
+  assert.deepEqual(Object.keys(models["GLM-5.2"].variants), ["low", "high"])
 })
 
 test("the model list comes from the main agent: original_id build, then CodeAgent, then the IDE's id", async () => {

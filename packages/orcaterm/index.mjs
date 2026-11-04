@@ -1791,6 +1791,9 @@ async function capiRequest(auth, action, data = {}) {
   }
 }
 
+// How long before a WeChat token expires magpie renews it (auth.refreshLead).
+const REFRESH_LEAD = 90 * 60 * 1000
+
 // ---- the plugin itself ------------------------------------------------------
 // The named OrcaTermAuthPlugin export is the plugin entry; _internal below is an
 // object for tests, so magpie does not call it as a second plugin.
@@ -1908,6 +1911,19 @@ export const OrcaTermAuthPlugin = async ({ client } = {}) => {
       // "maxConcurrency is 1" describes. OrcaTerm's budget is per account and
       // shared with its own desktop client, so one in flight.
       maxConcurrency: 1,
+
+      /**
+       * How long before `expires` magpie renews the WeChat token (#675).
+       * OrcaTerm drops the OAuth session together with an expired access
+       * token: `OAuthRefreshToken` then answers SESSION_EXPIRED for good, and
+       * only a new scan helps. magpie renews when something uses the account
+       * (a request, a usage read) once the token is within this lead of
+       * expiring; the default five minutes left a 2h token renewed only by a
+       * request in its last five minutes, so an account idle past that was
+       * signed out. 90 minutes (orinsid's patch, 40+ hours with no expiry)
+       * makes anything in the last hour and a half renew it.
+       */
+      refreshLead: REFRESH_LEAD,
 
       methods: [
         {
@@ -2036,6 +2052,16 @@ export const OrcaTermAuthPlugin = async ({ client } = {}) => {
           }
         } catch (err) {
           if (/expired|invalid|失效|过期/i.test(String(err?.message ?? ""))) {
+            // A refused renewal is not a signed-out account while the token
+            // it would replace still works: the access token drives the chat
+            // by itself until its own exp (#675: SESSION_EXPIRED came 30
+            // minutes into a two-hour token). Fail without `signIn`, so
+            // magpie keeps the sign-in and tries again; a request or a 401
+            // after the real expiry still marks it.
+            const exp = Math.max(readTokenClaims(bearer).exp * 1000, Number(auth?.expires) || 0)
+            if (exp > Date.now() + 60e3) {
+              throw new Error(`OrcaTerm renewal refused, the token still has life: ${err?.message ?? err}`)
+            }
             throw Object.assign(new Error(`OrcaTerm sign-in expired, scan again: ${err?.message ?? err}`), {
               signIn: "expired",
             })
