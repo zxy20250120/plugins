@@ -65,22 +65,31 @@ function windowsForAccount(provider, account, quotas, keyDir) {
   const card = quotas.find((q) => q.provider === provider && q.viaKey && (q.account.toLowerCase() === low || q.account.startsWith(`${name}${MASKED_SEP}`)));
   return card ? keepWindows(card.windows) : [];
 }
-function candidatesOf(provider, models, cache) {
-  if (cache) {
-    return cache.map((c) => ({ full: `${provider}/${c.id}`, bare: c.id, keys: c.keys }));
-  }
+function candidatesOf(provider, models, cache, chosen) {
   const prefix = `${provider}/`;
-  return models.map((m) => ({
-    full: m,
-    bare: m.startsWith(prefix) ? m.slice(prefix.length) : m,
-    keys: null
-  }));
+  const out = (cache ?? []).map((c) => ({ full: `${prefix}${c.id}`, bare: c.id, keys: c.keys }));
+  const seen = new Set(out.map((c) => c.full));
+  for (const m of models) {
+    if (seen.has(m))
+      continue;
+    seen.add(m);
+    out.push({ full: m, bare: m.startsWith(prefix) ? m.slice(prefix.length) : m, keys: null });
+  }
+  for (const bare of chosen) {
+    const full = `${provider}/${bare}`;
+    if (seen.has(full))
+      continue;
+    seen.add(full);
+    out.push({ full, bare, keys: null });
+  }
+  return out;
 }
 function modelsForAccount(provider, account, input) {
   const hasCache = input.cache !== null;
-  if (!hasCache && input.models.length === 0)
+  if (!hasCache && input.models.length === 0 && input.chosen.length === 0) {
     return { list: null, perAccount: false };
-  let cands = candidatesOf(provider, input.models, input.cache);
+  }
+  let cands = candidatesOf(provider, input.models, input.cache, input.chosen);
   if (hasCache && isFingerprint(account)) {
     cands = cands.filter((c) => !c.keys || c.keys.length === 0 || c.keys.includes(account));
   }
@@ -90,7 +99,10 @@ function modelsForAccount(provider, account, input) {
     const set = new Set(allowed);
     cands = cands.filter((c) => set.has(c.bare));
   }
-  const present = new Set(input.models);
+  const present = new Set([
+    ...input.models,
+    ...input.chosen.map((bare) => `${provider}/${bare}`)
+  ]);
   const list = cands.map((c) => c.full).filter((id) => present.has(id)).sort();
   return { list, perAccount: hasCache };
 }
@@ -137,10 +149,13 @@ function pickModels(provider, account, input) {
   };
 }
 function autoAccountModelsOf(provider, input) {
-  if (input.cache === null && input.models.length === 0)
+  if (input.cache === null && input.models.length === 0 && input.chosen.length === 0)
     return null;
-  const present = new Set(input.models);
-  return candidatesOf(provider, input.models, input.cache).map((c) => c.full).filter((id) => present.has(id)).sort();
+  const present = new Set([
+    ...input.models,
+    ...input.chosen.map((bare) => `${provider}/${bare}`)
+  ]);
+  return candidatesOf(provider, input.models, input.cache, input.chosen).map((c) => c.full).filter((id) => present.has(id)).sort();
 }
 function pinFor(provider, account, keyDir, quotas = []) {
   if (!account)
@@ -239,7 +254,7 @@ function entryOf(raw) {
         accountModels[k] = list;
     }
   }
-  return { keys, accountModels };
+  return { keys, accountModels, models: asStringArray(pr.models) ?? [] };
 }
 var readCache = new Map;
 function cached(key, load, worth) {
@@ -284,6 +299,7 @@ function readKeyDirectory(configDir) {
                 prev.keys.push(k);
             }
             Object.assign(prev.accountModels, entry.accountModels);
+            prev.models = entry.models;
           } else {
             map.set(id, entry);
           }
@@ -863,11 +879,13 @@ async function fetchCatalog(base) {
   for (const p of list) {
     const raws = rawModels.get(p.id) ?? [];
     p.models = raws.map((m) => ({ id: m.id, effort: pickEffort(m) })).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    const chosen = keyDir?.get(p.id)?.models ?? [];
     const built = accountsOf(p.id, {
       models: raws.map((m) => m.id),
       quotas: quotas.entries,
       keyDir,
-      cache: await readDefaultModelCache(p.id)
+      cache: await readDefaultModelCache(p.id),
+      chosen
     });
     p.accounts = built.accounts;
     p.autoAccountModels = built.autoAccountModels;
@@ -944,6 +962,197 @@ async function send(base, task, pin, effort, signal, timeoutMs = SEND_TIMEOUT_MS
 import { randomBytes, timingSafeEqual } from "crypto";
 import { readFile as readFile3 } from "fs/promises";
 import path2, { basename, extname, join as join3, resolve as resolve2 } from "path";
+// package.json
+var version = "0.1.2";
+
+// src/diagnostics.ts
+var DIAGNOSTICS_SCHEMA = "window-warmup-diagnostics/1";
+var LIST_MAX = 200;
+var RUNS_PER_TASK = 20;
+var TEXT_MAX = 400;
+var SCRUB_MIN_LEN = 4;
+var MASKED_SEP2 = " \xB7 ";
+
+class Aliases {
+  byRaw = new Map;
+  acctN = 0;
+  keyN = 0;
+  key(fingerprint, name) {
+    let alias = this.byRaw.get(fingerprint);
+    if (!alias) {
+      alias = `key-${++this.keyN}`;
+      this.byRaw.set(fingerprint, alias);
+    }
+    if (name && !this.byRaw.has(`name:${name.toLowerCase()}`))
+      this.byRaw.set(`name:${name.toLowerCase()}`, alias);
+    return alias;
+  }
+  account(raw) {
+    if (!raw)
+      return "";
+    const hit = this.byRaw.get(raw) ?? this.byRaw.get(`login:${raw.toLowerCase()}`);
+    if (hit)
+      return hit;
+    const alias = `acct-${++this.acctN}`;
+    this.byRaw.set(`login:${raw.toLowerCase()}`, alias);
+    return alias;
+  }
+  keyCard(user) {
+    const name = user.includes(MASKED_SEP2) ? user.slice(0, user.indexOf(MASKED_SEP2)) : user;
+    return this.byRaw.get(`name:${name.toLowerCase()}`) ?? this.account(user);
+  }
+  accountKey(k) {
+    return this.byRaw.get(k) ?? this.account(k);
+  }
+  raws() {
+    return [...this.byRaw].map(([k, v]) => [k.replace(/^(login|name):/, ""), v]).filter(([k]) => k.length >= SCRUB_MIN_LEN).sort((a, b) => b[0].length - a[0].length);
+  }
+}
+var escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function scrubber(aliases) {
+  const known = aliases.raws().map(([raw, alias]) => [new RegExp(escapeRe(raw), "gi"), alias]);
+  return (s) => {
+    let out = s;
+    for (const [re, alias] of known)
+      out = out.replace(re, alias);
+    out = out.replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, "<email>").replace(/\bBearer\s+\S+/gi, "Bearer <redacted>").replace(/\b(sk|pk|rk|ak|key)-[\w-]{8,}/gi, "<key>").replace(/([?&](?:key|api_?key|token|access_token|auth|sig|signature|cookie)=)[^&\s"']+/gi, "$1<redacted>").replace(/[A-Za-z0-9_-]{32,}/g, "<token>").replace(/(\/home|\/Users)\/[^/\s"']+/g, "$1/<user>").replace(/([A-Za-z]:\\Users\\)[^\\\s"']+/gi, "$1<user>");
+    return out.length > TEXT_MAX ? `${out.slice(0, TEXT_MAX)}\u2026\uFF08\u622A\u65AD\uFF0C\u539F\u957F ${out.length}\uFF09` : out;
+  };
+}
+function baseView(base) {
+  try {
+    const u = new URL(base);
+    return ["127.0.0.1", "localhost", "[::1]"].includes(u.hostname) ? `${u.protocol}//${u.host}` : "<\u975E\u672C\u673A\u5730\u5740>";
+  } catch {
+    return "<\u65E0\u6CD5\u89E3\u6790>";
+  }
+}
+async function buildDiagnostics(input) {
+  const now = input.now ?? new Date;
+  const truncated = [];
+  const cap = (list, path, max = LIST_MAX) => {
+    if (list.length <= max)
+      return list;
+    truncated.push(`${path}\uFF1A\u5171 ${list.length} \u6761\uFF0C\u53EA\u5BFC\u51FA\u524D ${max} \u6761`);
+    return list.slice(0, max);
+  };
+  const settle = (p) => p.then((ok) => ({ ok }), (e) => ({ error: errText(e) }));
+  const dirs = magpieDirs();
+  const [models, quotas, keyDir, catalog] = await Promise.all([
+    settle(fetchModels(input.base)),
+    settle(fetchQuotas(input.base)),
+    settle(readKeyDirectory(dirs.config)),
+    settle(fetchCatalog(input.base))
+  ]);
+  const dir = "ok" in keyDir ? keyDir.ok : null;
+  const quotaEntries = "ok" in quotas ? quotas.ok.entries : [];
+  const rawModels = "ok" in models ? models.ok : [];
+  const aliases = new Aliases;
+  for (const entry of dir?.values() ?? [])
+    for (const k of entry.keys)
+      aliases.key(k.fingerprint, k.name);
+  const cardAlias = (q) => q.viaKey ? aliases.keyCard(q.account) : aliases.account(q.account);
+  for (const q of quotaEntries)
+    cardAlias(q);
+  for (const t of input.tasks)
+    aliases.account(t.account);
+  for (const q of input.scheduler?.quotaEntries() ?? [])
+    cardAlias(q);
+  const scrub = scrubber(aliases);
+  const pids = new Set([
+    ...rawModels.map(modelProvider).filter(Boolean),
+    ...quotaEntries.map((q) => q.provider),
+    ...dir?.keys() ?? [],
+    ...input.tasks.map((t) => t.provider)
+  ]);
+  const catalogById = new Map(("ok" in catalog ? catalog.ok.providers : []).map((p) => [p.id, p]));
+  const providers = await Promise.all([...pids].sort().map(async (pid) => {
+    const entry = dir?.get(pid);
+    const v1 = rawModels.filter((m) => modelProvider(m) === pid);
+    const cache = await readDefaultModelCache(pid).catch(() => null);
+    const cat = catalogById.get(pid);
+    const path = `providers.${pid}`;
+    return {
+      id: pid,
+      v1Models: cap(v1.map((m) => ({
+        id: m.id,
+        owned_by: m.owned_by,
+        reasoning: m.reasoning,
+        reasoning_levels: m.reasoning_levels,
+        supported_reasoning_levels: m.supported_reasoning_levels?.map((l) => l.effort)
+      })), `${path}.v1Models`),
+      providersJson: entry ? {
+        chosen: cap(entry.models, `${path}.chosen`),
+        keys: entry.keys.map((k) => ({ alias: aliases.key(k.fingerprint, k.name), named: k.name !== "" })),
+        accountModels: Object.fromEntries(Object.entries(entry.accountModels).map(([k, v]) => [aliases.accountKey(k), v]))
+      } : null,
+      modelCache: cache ? cap(cache.map((c) => ({ id: c.id, keys: c.keys.map((fp) => aliases.accountKey(fp)) })), `${path}.modelCache`) : null,
+      quotaCards: quotaEntries.filter((q) => q.provider === pid).map((q) => ({ account: cardAlias(q), viaKey: q.viaKey, readAt: q.readAt ?? null, windows: q.windows })),
+      catalog: cat ? {
+        accounts: cat.accounts.map((a) => ({
+          id: a.kind === "key" ? aliases.accountKey(a.id) : aliases.account(a.id),
+          kind: a.kind,
+          windows: a.windows.map((w) => w.name),
+          models: a.models === null ? null : cap(a.models, `${path}.catalog.accounts.models`),
+          perAccount: a.perAccount,
+          autoModel: a.autoModel
+        })),
+        autoAccountModels: cat.autoAccountModels === null ? null : cap(cat.autoAccountModels, `${path}.catalog.autoAccountModels`),
+        autoModel: cat.autoModel
+      } : null
+    };
+  }));
+  const scheduler = input.scheduler;
+  const next = scheduler?.snapshot().next ?? {};
+  const tasks = await Promise.all(input.tasks.map(async (t) => {
+    const preview = scheduler ? await scheduler.previewSend(t) : { error: "\u8C03\u5EA6\u5668\u672A\u8FD0\u884C" };
+    const marks = input.marks[t.id];
+    return {
+      id: t.id,
+      enabled: t.enabled,
+      provider: t.provider,
+      account: aliases.account(t.account),
+      accountKind: /^[0-9a-f]{10}$/.test(t.account) ? "key" : t.account ? "login" : "",
+      model: t.model || "<\u81EA\u52A8>",
+      trigger: t.trigger,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt,
+      next: next[t.id] ?? null,
+      marks: marks ? { ...marks, resetKeys: marks.resetKeys.slice(-5).map(scrub) } : null,
+      sendPreview: "error" in preview ? { error: scrub(preview.error) } : { ...preview, pin: preview.pin === null ? null : scrub(preview.pin) }
+    };
+  }));
+  const runs = input.tasks.flatMap((t) => input.runs.filter((r) => r.taskId === t.id).slice(-RUNS_PER_TASK).map((r) => ({ ...r, reason: scrub(r.reason) })));
+  return {
+    schema: DIAGNOSTICS_SCHEMA,
+    note: "\u8D26\u53F7\u4E0E key \u5DF2\u6362\u6210\u522B\u540D\uFF08acct-N / key-N\uFF09\uFF0C\u4EFB\u52A1\u540D\u4E0E\u989D\u5EA6\u5361\u663E\u793A\u540D\u672A\u5BFC\u51FA\uFF0C\u81EA\u7531\u6587\u672C\u5DF2\u8131\u654F",
+    generatedAt: now.toISOString(),
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    plugin: { version, bun: Bun.version, platform: `${process.platform}-${process.arch}` },
+    gateway: {
+      base: baseView(input.base),
+      models: "ok" in models ? `ok\uFF08${models.ok.length} \u4E2A\uFF09` : scrub(models.error),
+      quotas: "ok" in quotas ? `ok\uFF08${quotas.ok.entries.length} \u5F20\u5361\uFF09` : scrub(quotas.error),
+      catalog: "ok" in catalog ? "ok" : scrub(catalog.error)
+    },
+    files: {
+      configDir: scrub(dirs.config),
+      cacheDir: scrub(dirs.cache),
+      dataDir: scrub(input.dir),
+      providersJson: "ok" in keyDir ? keyDir.ok.size > 0 ? `ok\uFF08${keyDir.ok.size} \u4E2A\u4F9B\u5E94\u5546\uFF09` : "\u6CA1\u6709\u6587\u4EF6\u6216\u4E3A\u7A7A" : keyDir.error
+    },
+    service: {
+      fatal: input.fatal === null ? null : scrub(input.fatal),
+      lockedBy: input.lockedBy,
+      saveError: scrub(scheduler?.snapshot().saveError ?? "") || null,
+      scheduler: scheduler?.debugView() ?? null
+    },
+    tasks,
+    runs,
+    providers,
+    truncated
+  };
+}
 
 // src/scheduler.ts
 import { randomUUID } from "crypto";
@@ -1145,6 +1354,32 @@ class Scheduler {
       timeline,
       saveError: this.saveError === null ? null : `\u72B6\u6001\u6587\u4EF6\u5199\u4E0D\u8FDB\u53BB\uFF1A${this.saveError}`
     };
+  }
+  debugView() {
+    return {
+      quotaAt: this.quota?.at.toISOString() ?? null,
+      quotaStale: this.quotaStale,
+      quotaTried: this.quotaTried,
+      keyDirLoaded: this.keyDirMap !== null,
+      inflight: [...this.inflight.keys()],
+      armedFor: Object.fromEntries([...this.armedFor].map(([id, at]) => [id, at.toISOString()]))
+    };
+  }
+  quotaEntries() {
+    return this.quota?.entries ?? null;
+  }
+  async previewSend(task) {
+    try {
+      const resolved = await this.resolveSend(task, await this.modelsFn(this.base));
+      if ("error" in resolved)
+        return resolved;
+      const pick = pickEffort(resolved.model);
+      if ("error" in pick)
+        return pick;
+      return { model: resolved.id, pin: resolved.pin, effort: pick.send };
+    } catch (e) {
+      return { error: errText(e) };
+    }
   }
   snapshotTask(task, now, next, points) {
     if (task.trigger.kind === "window") {
@@ -1415,24 +1650,33 @@ class Scheduler {
       this.modelCacheFn(task.provider).catch(() => null)
     ]);
     const pin = pinFor(task.provider, task.account, keyDir, this.quota?.entries ?? []);
+    const chosen = keyDir?.get(task.provider)?.models ?? [];
     if (task.model) {
       const model = models.find((m) => m.id === task.model);
-      return model ? { id: task.model, model, pin } : { error: `\u6A21\u578B ${task.model} \u5DF2\u4E0D\u5728 Magpie \u7684\u6A21\u578B\u5217\u8868\u91CC` };
+      if (model)
+        return { id: task.model, model, pin };
+      if (chosen.some((bare) => bare === task.model || `${task.provider}/${bare}` === task.model)) {
+        return { id: task.model, model: { id: task.model }, pin };
+      }
+      return { error: `\u6A21\u578B ${task.model} \u5DF2\u4E0D\u5728 Magpie \u7684\u6A21\u578B\u5217\u8868\u91CC` };
     }
     const ids = models.filter((m) => modelProvider(m) === task.provider).map((m) => m.id);
-    const list = modelsForAccount(task.provider, task.account, { models: ids, keyDir, cache }).list;
+    const list = modelsForAccount(task.provider, task.account, {
+      models: ids,
+      keyDir,
+      cache,
+      chosen
+    }).list;
     if (list === null) {
       return { error: `\u4F9B\u5E94\u5546 ${task.provider} \u8FD8\u6CA1\u6709\u6A21\u578B\u5217\u8868\uFF0C\u65E0\u6CD5\u81EA\u52A8\u9009\u6A21\u578B` };
     }
     if (list.length === 0)
       return { error: `\u8D26\u53F7 ${task.account || "\u81EA\u52A8"} \u6CA1\u6709\u53EF\u7528\u6A21\u578B` };
-    const chosen = pickAutoModel(list.map((id) => ({ id })));
-    if (!chosen)
+    const chosenModel = pickAutoModel(list.map((id) => ({ id })));
+    if (!chosenModel)
       return { error: `\u8D26\u53F7 ${task.account || "\u81EA\u52A8"} \u6CA1\u6709\u53EF\u7528\u6A21\u578B` };
-    const model = models.find((m) => m.id === chosen.id);
-    if (!model)
-      return { error: `\u6A21\u578B ${chosen.id} \u5DF2\u4E0D\u5728 Magpie \u7684\u6A21\u578B\u5217\u8868\u91CC` };
-    return { id: chosen.id, model, pin };
+    const model = models.find((m) => m.id === chosenModel.id) ?? { id: chosenModel.id };
+    return { id: chosenModel.id, model, pin };
   }
   async sendAndFinalize(task, run, entry, savedRunning) {
     try {
@@ -1559,7 +1803,7 @@ class Scheduler {
 import { link, mkdir, readdir, readFile as readFile2, rename, unlink, writeFile } from "fs/promises";
 import { join as join2 } from "path";
 import { randomUUID as randomUUID2 } from "crypto";
-var RUNS_PER_TASK = 50;
+var RUNS_PER_TASK2 = 50;
 var RESET_KEYS_PER_TASK = 20;
 var STATE_FILE = "state.json";
 var LOCK_FILE = "service.lock";
@@ -1694,7 +1938,7 @@ function truncateState(data) {
     const r = data.runs[i];
     const n = (counts.get(r.taskId) ?? 0) + 1;
     counts.set(r.taskId, n);
-    if (n <= RUNS_PER_TASK)
+    if (n <= RUNS_PER_TASK2)
       kept.push(r);
   }
   data.runs = kept.reverse();
@@ -2029,6 +2273,19 @@ async function startService(opts) {
       } catch (e) {
         return json({ error: errText(e) }, 502, cors);
       }
+    }
+    if (req.method === "GET" && path === "/api/diagnostics") {
+      const data = await buildDiagnostics({
+        base: opts.base,
+        dir: opts.dir,
+        tasks: store?.data.tasks ?? [],
+        runs: store?.data.runs ?? [],
+        marks: store?.data.marks ?? {},
+        scheduler,
+        fatal,
+        lockedBy
+      });
+      return json(data, 200, cors);
     }
     const blocked = readonlyBlock(cors);
     if (blocked)

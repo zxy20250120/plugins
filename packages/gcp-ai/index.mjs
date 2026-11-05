@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises"
 import { defaultProfile, validateProject } from "./lib/browser.mjs"
 import { resolveIdentity, startLogin, tokenProvider, identityOf } from "./lib/credentials.mjs"
 import { consoleAccountFor, fetchCredits, usageOf } from "./lib/credits.mjs"
+import { hardenRequest } from "./lib/history.mjs"
 import { testEndpoint } from "./lib/endpoint.mjs"
 import { providerModels, seedModels } from "./lib/models.mjs"
 
@@ -82,19 +83,33 @@ function geminiRoute(pathname, base) {
   return GEMINI_ROUTE.test(pathname.slice(base.length))
 }
 
-// One probe per project and location per process: the answer cannot change
-// between two model calls in the same run, and the same run's later loads
-// should not ask Google again.
-const tested = new Set()
+// A probe is remembered for the process, but only a credential refusal blocks
+// requests. That verdict expires so a later load can retry recovered credentials.
+const tested = new Map()
 
-async function endorse(identity, location, owner) {
+function endorse(identity, location, owner) {
   // Two accounts can serve the same project and location; the probe is about
-  // the credential, so it is remembered per account, not per address.
-  const key = `${owner ?? identity.project}/${identity.project}/${location}`
-  if (tested.has(key)) return
-  const report = await testEndpoint({ ...identity, location }, { models: [], timeout: 15000 })
-  if (!report.reachable) throw new Error(`The Google model endpoint is not usable for ${identity.project} (${location}); check that the project exists, the Vertex AI API is enabled and the account may use it`)
-  tested.add(key)
+  // the credential, so it is remembered per account, not per address. Share
+  // the state while it runs so neither a loader nor a model request waits for it.
+  const key = JSON.stringify([owner, identity.account, identity.authMode, identity.cloudsdkConfig, identity.project, location])
+  if (!tested.has(key)) {
+    const state = {}
+    tested.set(key, state)
+    const probe = () => testEndpoint({ ...identity, location }, { models: [], timeout: 15000 })
+    void probe().then(async (report) => {
+      if (report.locationTest?.status !== 401) return
+      // The probe shares the loader's token cache, so a 401 can mean the cached
+      // token was revoked or replaced: drop it and ask once more with a fresh
+      // token before holding requests on a verdict a refresh would fix.
+      tokenProvider(identity).invalidate()
+      report = await probe()
+      if (report.locationTest?.status !== 401) return
+      state.error = new Error(`The Google model endpoint is not usable for ${identity.project} (${location}); check that the project exists, the Vertex AI API is enabled and the account may use it`)
+      const timer = setTimeout(() => { if (tested.get(key) === state) tested.delete(key) }, 60000)
+      timer.unref?.()
+    }).catch(() => {})
+  }
+  return key
 }
 
 export const GoogleVertexAuthPlugin = async (input = {}, pluginOptions = {}) => {
@@ -191,26 +206,38 @@ export const GoogleVertexAuthPlugin = async (input = {}, pluginOptions = {}) => 
         const identity = await resolveIdentity(options)
         const baseURL = endpoint(identity.project, options.location)
         const getToken = tokenProvider(identity)
-        // The host has no test button of its own, so the first request after a
-        // sign-in is where an unusable endpoint is named. Reading the location
-        // resource is free, runs once per project, and turns a bad project or a
-        // disabled API into a clear error instead of a failed model call. No
-        // model is asked anything: that is the person's test to make.
-        await endorse(identity, options.location, auth?.accountId ?? auth?.project ?? identity.project)
+        // Probe in the background so a slow location check does not hold up the
+        // first model request. Only a credential refusal blocks later requests;
+        // loaders for the same credential share the result.
+        const probeKey = endorse(identity, options.location, auth?.accountId ?? auth?.project ?? identity.project)
         const allowed = new URL(baseURL)
         return {
           baseURL, apiKey: "vertex-managed",
           async fetch(input, init) {
-            const request = new Request(input, init)
-            const url = new URL(request.url)
+            const probe = tested.get(probeKey)
+            if (probe?.error) throw probe.error
+            const asked = new Request(input, init)
+            const url = new URL(asked.url)
             if (url.origin !== allowed.origin || !url.pathname.startsWith(allowed.pathname + "/")) throw new Error("Refusing to send a Vertex credential outside the configured Google model endpoint")
             if (!geminiRoute(url.pathname, allowed.pathname)) throw new Error("Refusing to send a Vertex credential to a route the Gemini endpoint does not serve")
+            // Gemini's history rules: a conversation ending or opening with
+            // the model's turn, or a tool's response beside the user's words,
+            // is sent in the shape Vertex takes instead of answered 400 (#734)
+            const request = await hardenRequest(asked)
             const headers = new Headers(request.headers)
             headers.delete("x-goog-api-key")
             headers.delete("x-api-key")
             headers.set("authorization", `Bearer ${await getToken()}`)
             headers.set("x-goog-user-project", identity.project)
-            return fetch(new Request(request, { headers, redirect: "error" }))
+            // Keep the body available if Vertex rejects a cached credential.
+            const retry = request.clone()
+            const response = await fetch(new Request(request, { headers, redirect: "error" }))
+            if (response.status !== 401) return response
+            // Free the connection before the retry: this reply is not returned.
+            await response.body?.cancel().catch(() => {})
+            getToken.invalidate()
+            headers.set("authorization", `Bearer ${await getToken()}`)
+            return fetch(new Request(retry, { headers, redirect: "error" }))
           },
         }
       },

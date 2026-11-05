@@ -19,6 +19,7 @@ import { tr } from "../../util/i18n.js";
 type AcpSelectValue = { value?: string; name?: string; options?: AcpSelectValue[] };
 type AcpConfigOption = { id: string; category?: string | null; type?: string; currentValue?: unknown; options?: AcpSelectValue[] };
 import { log } from "../../log.js";
+import { OutputDecoder } from "../../util/decode.js";
 
 const rid = () => Math.random().toString(36).slice(2, 10);
 
@@ -97,8 +98,9 @@ export class AcpSession implements ProviderSession {
     if (!bin.ok) throw new Error(bin.reason);
     try {
       this.child = spawnResolved(bin, launchArgv(this.o.acpArgs, this.o.launch), { cwd: this.o.cwd });
+      const errDec = new OutputDecoder(); // 1.3: stderr may be in the Windows code page (GBK)
       this.child.stderr?.on("data", (d: Buffer) => {
-        const t = d.toString().trim();
+        const t = errDec.write(d).trim();
         if (t) log("info", `[${this.o.binName} acp] ${t.slice(0, 500)}`);
       });
       this.child.on("error", (e) => this.failInit(e));
@@ -396,7 +398,7 @@ export class AcpSession implements ProviderSession {
       return;
     }
     // An image-only message is still a prompt: images go as image blocks when the Agent takes them, else by file path
-    const built = await buildAcpPrompt(text, attachments, this.promptCaps);
+    const built = await buildAcpPrompt(text, attachments, this.promptCaps, input.mentions ?? []);
     const agent = this.o.providerName ?? this.o.binName;
     if (built.imagesByPath.length && !this.promptCaps.image) {
       const switched = this.o.imagesFollowStartModel && this.initCaps.image && this.o.model !== this.startModel;

@@ -709,6 +709,12 @@ async function claimHint(s) {
 // (seen 10-06, #30).
 const CLAIMED_ALREADY = 1003
 const CAPTCHA = 3007
+// NOT_ELIGIBLE is /billing/claim's body code for a plan the account is not
+// offered at that moment: HTTP 400 {"code":1004,…}. A stale APP_VERSION
+// answers it for every account at once (11-04: six accounts all answered
+// 1004 under 3.16.3's header, and four of them claimed with code 0 under
+// 3.17.2's, one night, with nothing else changed).
+const NOT_ELIGIBLE = 1004
 const CAPTCHA_WORDS = /captcha/i
 
 // The marketing feed and the claim are gated on the client's version:
@@ -743,6 +749,7 @@ async function claimOne(s, planID) {
   const msg = typeof env?.msg === "string" ? env.msg : ""
   if (code === CAPTCHA || CAPTCHA_WORDS.test(msg)) return { outcome: "captcha", why: msg || `code ${code}` }
   if (code === CLAIMED_ALREADY) return { outcome: "done" }
+  if (code === NOT_ELIGIBLE) return { outcome: "ineligible", why: msg || `code ${code}` }
   if (code === 0 && res.ok) return { outcome: "claimed" }
   if (!Number.isFinite(code)) return { outcome: "failed", why: `HTTP ${res.status}, unreadable reply ${String(text ?? "").trim().slice(0, 120) || "(empty)"}` }
   return { outcome: "failed", why: `${msg || "error"} (HTTP ${res.status}, code ${code})` }
@@ -761,6 +768,12 @@ async function claimOne(s, planID) {
 // gifts are the rewards website's, claimed in the client.
 const TOUCH = "/api/v1/marketing/touch"
 const CLAIM_ACTION = "claim_zcode_plan"
+// touchSeq is the feed's seq: ZCode's own count of its feed requests
+// since the process started, from 0, one GET per refresh. It is not a
+// page: "仅供服务端日志定位，不改变投放判断" (docs/marketing-touch-client.md,
+// marketingTouchService.ts's bootRequestSeq, zai-org/ZCode@a9fe401), so a
+// check-in asks once, never seq 0..8 in a row (plugins#676), and a banner
+// seen at one seq and not another is a delivery arriving later.
 let touchSeq = 0
 // clientLanguage is the language ZCode names to marketing/touch: zh-CN or
 // en-US, its two UI languages, never another (marketingTouchService's
@@ -847,7 +860,9 @@ const recheck = () => new Date(Date.now() + RECHECK_MS).toISOString()
 // toClaim, the app's banners and its preview), as auth.checkin's answer:
 // inactive when neither lists one, claimed when one was claimed now,
 // done when each was claimed before, captcha when ZCode wants the app's
-// captcha for one (it is claimed in the ZCode app), failed when a list
+// captcha for one (it is claimed in the ZCode app), ineligible when
+// ZCode is not offering one at that moment (code 1004, read again later
+// in the day), failed when a list
 // or a claim can't be read. A failed one is asked again later in the
 // day, when a plan claimed now answers 1003. An inactive stands only
 // until RECHECK_MS from now, so a plan dropped into the feed later in
@@ -867,6 +882,7 @@ async function claimDaily(s) {
   const said = [
     claimed.length ? `claimed ${claimed.join(", ")}` : "",
     ...got.filter((g) => g.outcome === "captcha").map((g) => `${g.name}: claim it in the ZCode app (${g.why})`),
+    ...got.filter((g) => g.outcome === "ineligible").map((g) => `${g.name}: ${g.why}`),
     ...got.filter((g) => g.outcome === "failed").map((g) => `${g.name}: ${g.why}`),
     ...unread,
   ].filter(Boolean).join("; ")
@@ -876,6 +892,10 @@ async function claimDaily(s) {
   if (unread.length || got.some((g) => g.outcome === "failed")) return { outcome: "failed", message: said }
   if (got.some((g) => g.outcome === "captcha")) return { outcome: "captcha", message: said }
   if (claimed.length) return { outcome: "claimed", message: said }
+  // a plan not offered now can be offered later in the day (11-04: an
+  // account's GLOBAL BUILD banner showed 28 minutes after it signed in),
+  // so an ineligible is read again half an hour out, as an inactive is
+  if (got.some((g) => g.outcome === "ineligible")) return { outcome: "ineligible", message: said, until: recheck() }
   return { outcome: "done", message: `already claimed: ${named("done").join(", ")}` }
 }
 
@@ -2355,6 +2375,11 @@ export async function ZCodeAuthPlugin({ client, magpie } = {}, options = {}) {
         // the list it was told last, as the built-in keeps the one it fetched last
         const fell = !ms.length
         if (fell) ms = start ? START_MODELS : MODELS
+        // a gift-only account serves what its balance names, as ZCode
+        // offers it (resolveStartPlanBalanceAvailability): the Start
+        // Plan's config models the balance lacks would only be refused
+        // (young02036). A balance naming none leaves the config's list.
+        if (start && giftNames(gift).length) ms = ms.filter((m) => giftNames(gift).some((x) => x.toLowerCase() === m.id.toLowerCase()))
         const url = s.base + "/v1"
         const out = Object.fromEntries(ms.map((m) => [m.id, model(m, url)]))
         const details = [...ms, ...modelsOf(cfg, planID(START_BASE)), ...modelsOf(cfg, planID(ZAI_BASE)), ...MODELS]

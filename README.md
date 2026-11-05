@@ -37,7 +37,8 @@ subscription and makes its requests. The packages work in OpenCode and in
 | [qoder](packages/qoder) | Qoder CN subscription (qoder.cn), with Qoder CN's device sign-in | `qoder-cn` |
 | [raccoon](packages/raccoon) | SenseTime Raccoon (商汤小浣熊, xiaohuanxiong.com): account credits and daily check-in, with browser sign-in or Raccoon desktop's sign-in | `raccoon` |
 | [river](packages/river) | River (river.ai) pay-as-you-go inference, with your API key: per-account models, documented reasoning efforts and live prices | `river` |
-| [sensenova](packages/sensenova) | SenseNova (商汤日日新) Token Plan: one console sign-in gives the credit pools, windows and grants, and (with an optional API key) the plan's models for chat | `sensenova-token-plan` |
+| [sap-aicore](packages/sap-aicore) | SAP AI Core deployments for account-scoped GPT Responses and Claude Messages models | `sap-aicore` |
+| [sensenova](packages/sensenova) | SenseNova (商汤日日新) Token Plan: browser or password sign-in gives the credit pools, windows and grants, and the plan's models — the browser sign-in reuses or creates a Token Plan API key for you | `sensenova-token-plan` |
 | [trae](packages/trae) | Trae CN (trae.cn) and Trae international (trae.ai), free tier included, with Trae's browser sign-in (experimental) | `trae-cn`, `trae-global` |
 | [workbuddy](packages/workbuddy) | WorkBuddy (China build, CodeBuddy plan) | `workbuddy` |
 | [workbuddy](packages/workbuddy) | WorkBuddy (international build) | `workbuddy-ai` |
@@ -115,7 +116,21 @@ A tools package is a folder under `packages/<name>/` with:
 
 ## Web search APIs
 
-A tools package can also give magpie a web search API. It is listed in Settings › Models › Web search under its own name, after Tavily, Brave and the rest, and is added, keyed, switched off and ordered like them. magpie keeps the keys (several are tried in turn; a refused one rests), masks the query, and logs the call. magpie's own `search` hook; OpenCode ignores it. There is no package for one yet: this is the template.
+A tools package can also give magpie a web search API. It is listed in Settings › Models › Web search under its own name, after Tavily, Brave and the rest, and is added, keyed, switched off and ordered like them. magpie keeps the keys (several are tried in turn; a refused one rests), masks the query, and logs the call. magpie's own `search` hook; OpenCode ignores it.
+
+| Package | Search APIs |
+|---|---|
+| [magpie-websearch](https://github.com/guotree/magpie-websearch) | AnySearch, Keenable, Linkup, Metaso, Parallel, Querit and TinyFish; published as `@guotree/magpie-websearch` and maintained in its own repository |
+
+Install magpie-websearch:
+
+```sh
+magpie plugin add @guotree/magpie-websearch
+```
+
+### Writing a web search plugin
+
+The following template shows how to implement the `search` hook:
 
 ```js
 // index.mjs of @magpie-community/tools-<name>
@@ -179,6 +194,7 @@ Like middleware, these run on the requests agents send, but in magpie's Bun host
 | [aelios](packages/aelios) | [Aelios](https://github.com/Aelios-project/Aelios) recall before each turn from your own Aelios on Cloudflare, and opt-in recording of each turn so Aelios can remember it |
 | [respire-memory](packages/respire-memory) | [Respire](https://github.com/risense-ai/respire-magpie): per-turn recall and complete policy reads, automatic process diaries, and grounded experience archival with readback; storage runs after reply completion |
 | [OpenViking](https://github.com/volcengine/OpenViking/tree/main/examples/magpie-memory-plugin) | OpenViking context recall and opt-in completed-conversation capture using existing OpenViking configuration; published as `@openviking/magpie-plugin` and maintained in the OpenViking repository |
+| [@vshulcz/magpie-deja](https://github.com/vshulcz/deja-vu/tree/main/extensions/magpie) | [deja-vu](https://github.com/vshulcz/deja-vu) local cross-agent session memory: recalls project-scoped (`ctx.cwd`) history from the transcripts Claude Code, Codex, Hermes, Gemini CLI, OpenCode, Cursor and DSH write on disk, scrubs secret patterns, and attaches the recalled excerpt to the request sent to your model provider; when recalled history helped, the model is asked to end its reply with a one-line `déjà vu: … — reusing it.` note |
 | [notify](packages/notify) | A push to ntfy, Bark, Gotify, Server酱, Feishu, DingTalk, WeCom, Telegram or a webhook when an agent's turn is done or fails, after it ran `minMinutes` or longer |
 
 Use the same plugin management commands as middleware:
@@ -234,11 +250,12 @@ it off puts the config back.
 | Package | Agent |
 |---|---|
 | [aider](packages/aider) | [Aider](https://aider.chat): `~/.aider.conf.yml`, through litellm's `openai/` prefix |
+| [reasonix-desktop](packages/reasonix-desktop) | [Reasonix 1.x](https://github.com/esengine/DeepSeek-Reasonix/tree/main-v2) Desktop and CLI: reversible global TOML/dotenv bridge; restart Reasonix after choosing a model. Separate from the built-in Studio 2.x adapter |
 | [bub](packages/bub) | [Bub](https://bub.build): `~/.bub/config.yml`, as the `magpie:` provider (needs Bub 0.5.1 or later) |
 | [kilo](packages/kilo) | [Kilo Code](https://kilo.ai): `~/.config/kilo/kilo.jsonc`, through an OpenAI-compatible provider |
 | [junie](packages/junie) | [Junie CLI](https://junie.jetbrains.com/): an explicit `/v1/models` seed for its full picker and Magpie's selected model as the launch default; no LiteLLM |
 | [kimi-desktop](packages/kimi-desktop) | Ordinary [Kimi desktop](https://www.kimi.com/) Work, through its authenticated local runtime; not Kimi Code CLI |
-| [pig](packages/pig) | [PiG](https://github.com/MichaelKinsy/PiG): injects Magpie's endpoint and model catalog into `~/.pig/agent/models.json`; choose the model in PiG, startup settings stay unchanged |
+| [pig](packages/pig) | [PiG](https://github.com/MichaelKinsy/PiG): Magpie's endpoint and model catalog in `~/.pig/agent/models.json`, and the model PiG starts on (`defaultProvider`/`defaultModel` in `settings.json`) picked on the Agents page |
 | [type4me](packages/type4me) | [Type4Me](https://github.com/joewongjc/type4me), macOS voice input: `~/Library/Application Support/Type4Me/magpie-agent.json`, for its LLM post-processing |
 | [opencodereview](packages/opencodereview) | [Open Code Review](https://github.com/alibaba/open-code-review) (`ocr`): `~/.opencodereview/config.json` as a custom Anthropic provider, so `ocr review` / `ocr scan` run on magpie's models |
 
@@ -248,9 +265,17 @@ magpie plugin add @magpie-community/agent-<name>
 
 An agent package is a folder under `packages/<name>/` with:
 
-- **`package.json`**: name `@magpie-community/agent-<name>`, `"magpie": {"agent": "./<name>.agent.js"}`, no `main`.
+- **`package.json`**: name `@magpie-community/agent-<name>`, `"magpie": {"agent": "./<name>.agent.js"}`, and no `main` unless the agent needs a runtime (below).
 - **`<name>.agent.js`**: exports `agent` (where the agent keeps its model) and, if it needs more than the model, `connect` (the other keys to write) ([the reference](https://usemagpie.ai/docs/plugins#agents)). It runs in magpie on moejs, so it is one file and imports nothing.
 - a test of what `connect` returns.
+
+An agent that needs more than moejs gives it (a timer, a file watched, a
+value carried into the app's own config while it runs) keeps its
+`<name>.agent.js` as above and adds a Bun module as the package's `main`,
+run in the plugin host as a provider plugin's is (kimi-desktop and
+reasonix-desktop do). It is still an agent: magpie lists a package that
+declares `magpie.agent` under Agents, on GitHub too, `main` or not, and its
+Installed row wears Provider only when that module serves a provider.
 
 ## Skills
 
@@ -376,7 +401,8 @@ MIT
 `registry.json` is the list magpie's Plugins tab shows: the packages
 here. An entry that signs in to nothing has a `"kind"` and no `providers`:
 `"middleware"` for gateway middleware and routing strategies, `"tools"`,
-`"page"` or `"agent"`. magpie
+`"page"` or `"agent"`. A package that declares `magpie.agent` is
+`"agent"`, with a `main` or without. magpie
 fetches it every few hours and keeps a copy built into the app for when
 it can't. To list a plugin, add an entry with its npm `package`, a
 `name`, `providers` (the provider ids it signs in to), an `icon` (one

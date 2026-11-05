@@ -314,26 +314,38 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 // gives the IDE a 15- or 16-digit one (iCubeAuthInfo://icube-dc:<id>, see
 // clientDevice), and Trae CN answers a check-in claim on a 19-digit id
 // 9074 where the same account and token on a 16-digit one are taken
-// (magpie-community/plugins#194). Trae's global site keeps the 19 digits
-// it was signed in with: nothing says its ids are shaped otherwise.
+// (magpie-community/plugins#194). The check-in no longer goes on it: since
+// plugins#709 Trae CN refuses 16 digits there too, and ugDevice makes the
+// claim's 15-digit id. Trae's global site keeps the 19 digits it was signed
+// in with: nothing says its ids are shaped otherwise.
 const newDevice = (site) => ({ deviceId: digits(site?.id === "trae-cn" ? 16 : 19), machineId: randomBytes(16).toString("hex"), ...newDeviceKey() })
 
 // ugDevice is the device id a Trae CN account's check-in goes on when this
-// machine's client isn't signed in as it: its own when that already has a
-// client's shape (15 or 16 digits), else, for an account signed in before
-// 0.2.16 with 19 digits, a 16-digit id made from its own device id and
-// uid. That one is the same on every check-in of the account, never
-// rotated and never another account's: it is the account's own device in
-// the shape Trae CN takes (#194), not a new device to get past a refusal,
-// and a 9095 (this device is in for today) on it stays the day's answer.
-// The chat's pages and the renewal keep the device the account signed in
-// with.
+// machine's client isn't signed in as it: its own when that is already 15
+// digits, else a 15-digit id made from its own device id and uid. On
+// 2026-11-05 (plugins#709) Trae CN answered the plugin's claim on an
+// account's own 16-digit id 9074, and the same account, token, headers and
+// body, seconds later, on a 15-digit id (a random one nothing had
+// registered) were taken: on three accounts, from two machines on two
+// ISPs, with magpie's headers and with wild-work's alike, 16 digits was
+// refused every time and 15 taken every time. The client-less tools that
+// check in (trae-mate, providers-hub, wild-work) all send 15 digits too.
+// #194 had found 19 refused and 16 taken; a server-side change between
+// the two is the plain reading. The id is the same on every check-in of
+// the account, never rotated and never another account's, and its first
+// digit is never 0 (a 0 would make it 14 digits as a number): it is the
+// account's own device in the shape Trae CN takes, not a new device to get
+// past a refusal, and a 9095 (this device is in for today) on it stays the
+// day's answer. The chat's pages and the renewal keep the device the
+// account signed in with (16 digits since 0.2.16, 19 before): nothing
+// measured says they want another, and the device is bound into the
+// renewed JWT.
 function ugDevice(a) {
   const id = String(a.deviceId ?? "")
-  if (/^\d{15,16}$/.test(id)) return id
+  if (/^\d{15}$/.test(id)) return id
   if (!id && !a.uid) return id
   const n = BigInt("0x" + createHash("sha256").update(`trae-cn-device\0${id}\0${a.uid ?? ""}`).digest("hex").slice(0, 30))
-  return String(1_000_000_000_000_000n + (n % 9_000_000_000_000_000n))
+  return String(100_000_000_000_000n + (n % 900_000_000_000_000n))
 }
 
 // newDeviceKey is the device's key pair, an ECDSA P-256 one as the clients
@@ -805,6 +817,68 @@ function ugHeaders(a, site, extra = {}, own) {
     delete h["x-device-brand"]
   }
   return { ...h, ...extra }
+}
+
+// clientShape is the claim request that three tools which check in Trae CN
+// accounts with no Trae CN client on the machine send, and which Trae CN
+// takes: luckymiaow/trae-mate (checkin.rs build_headers, device_map.rs;
+// MIT), iJetLi/dsh-providers-hub's port of it (traeCheckinHeaders), and
+// rockswang/wild-work. All three send body {}, `x-user-region: CN` and a
+// 15-digit device id, none sends the Electron User-Agent or 0.1.69, and
+// none retries a 9074 (wild-work's 8s retry never ran: every one of its
+// claims was taken first time, plugins#709). On plugins#722 the same
+// account this plugin's claim gets 9074 on checks in daily through
+// providers-hub. This is trae-mate's request as it is: its headers, and
+// its device, market user and session ids made from the uid alone, so an
+// account checks in on the device those tools already use for it.
+// plugins#709's bisect then found the id's length to be what Trae CN
+// decides on (16 refused, 15 taken, the headers and body changing
+// nothing), so since 0.2.30 the first claim goes on 15 digits too
+// (ugDevice). This request stays as the one fallback after a 9074: the
+// bisect didn't send it with a 16-digit id, so that nothing else in it
+// matters is not measured.
+const seeded = (seed, salt, n) => {
+  const out = []
+  for (let i = 0; out.length < n; i++) {
+    const c = Buffer.alloc(4)
+    c.writeUInt32BE(i)
+    out.push(...createHash("sha256").update(`${salt}:${seed}`).update(c).digest())
+  }
+  return out.slice(0, n)
+}
+const shapeDevice = (uid) => seeded(String(uid), "devid", 15).map((b) => b % 10).join("")
+function shapeMarketUser(uid) {
+  const b = seeded(String(uid), "market", 16)
+  b[6] = (b[6] & 0x0f) | 0x40
+  b[8] = (b[8] & 0x3f) | 0x80
+  const h = Buffer.from(b).toString("hex")
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
+}
+function clientShapeHeaders(a) {
+  const uid = String(a.uid)
+  return {
+    Authorization: `Cloud-IDE-JWT ${a.token}`,
+    Accept: "*/*",
+    "Accept-Encoding": "gzip, deflate",
+    "Accept-Language": "zh-CN",
+    "Content-Type": "application/json",
+    "User-Agent": "VSCode 1.107.1 (TRAE SOLO CN)",
+    "x-market-client-id": "VSCode 1.107.1",
+    "x-market-user-id": shapeMarketUser(uid),
+    "x-user-region": "CN",
+    "x-device-id": shapeDevice(uid),
+    "x-lgw-req-sdk-type": "3",
+    "package-type": "stable_cn",
+    "x-lscbd-aid": "787976",
+    "x-lscbd-platform": "windows",
+    "app-version": "0.1.45",
+    "x-tt-trace-id": `00-${randomBytes(8).toString("hex")}-01`,
+    "vscode-sessionid": Buffer.from(seeded(uid, "sess", 32)).toString("hex"),
+    "x-request-id": randomUUID(),
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "no-cors",
+    "sec-fetch-site": "none",
+  }
 }
 
 // ---- this machine's own Trae CN client ----------------------------------------------
@@ -2781,6 +2855,80 @@ const maxModel = (...ms) => {
 // deepseek-v4.1-flash in Max mode
 const MAX = "-max"
 
+  // traeRateOf is a model's consumption multiplier, from the account's list:
+  // display_contact_config is a JSON string naming the rate now and the full
+  // price, and an activity's off-peak windows, which are computed here rather
+  // than trusted from the snapshot the list was read at (a list fetched in
+  // the morning would otherwise say the day price all evening).
+  const traeRateOf = (m, now = Date.now()) => {
+    // A field written badly (an unknown time_zone throws in Intl) must cost
+    // this model its rate alone: this runs inside modelOf, whose caller falls
+    // back to the static list on a throw, losing every model of the list.
+    const read = (raw) => {
+      if (!raw) return {}
+      let cfg
+      try { cfg = typeof raw === "string" ? JSON.parse(raw) : raw } catch { return {} }
+      if (!cfg || typeof cfg !== "object") return {}
+      const num = (x) => (x === null || x === "" || x === undefined ? undefined : Number.isFinite(Number(x)) ? Number(x) : undefined)
+      const activity = cfg.activity_discount
+      const offPeak = activity?.data?.off_peak
+      const windows = Array.isArray(offPeak?.time_windows) ? offPeak.time_windows : []
+      // enable: false says the rate is not in force; the list may keep a
+      // stale data.rate there, so it is not shown.
+      let rate = cfg.consumption_rate?.enable === false ? undefined : num(cfg.consumption_rate?.data?.rate)
+      // A member discount runs alongside consumption_rate, which keeps the
+      // price before it (0.78 while discount.data.consumption_rate is 0.58):
+      // the discounted price is the one to show.
+      const discount = cfg.discount
+      if (discount?.enable) {
+        const after = num(discount?.data?.consumption_rate)
+        if (after !== undefined) rate = after
+      }
+      const was = num(activity?.data?.current?.before_consumption_rate)
+        ?? num(offPeak?.before_consumption_rate)
+        ?? num(discount?.data?.original_consumption_rate)
+      if (activity?.enable && windows.length) {
+        const zone = typeof offPeak?.time_zone === "string" && offPeak.time_zone ? offPeak.time_zone : "Asia/Shanghai"
+        rate = inWindows(windows, zone, now)
+          ? num(offPeak?.after_consumption_rate) ?? rate
+          : num(offPeak?.before_consumption_rate) ?? rate
+      }
+      return {
+        ...(rate !== undefined ? { rate } : {}),
+        ...(rate !== undefined && was !== undefined && was > rate ? { rateWas: was } : {}),
+      }
+    }
+    try {
+      return read(m?.display_contact_config)
+    } catch {
+      // a bad window costs the rate only; give back what the plain field says
+      try {
+        const cfg = typeof m?.display_contact_config === "string" ? JSON.parse(m.display_contact_config) : m?.display_contact_config
+        const plain = cfg?.consumption_rate?.enable === false ? undefined : Number(cfg?.consumption_rate?.data?.rate)
+        return Number.isFinite(plain) ? { rate: plain } : {}
+      } catch { return {} }
+    }
+  }
+
+  // inWindows says whether now falls in one of the windows, as the list
+  // spells them: weekdays 1–7 (Monday first), minutes from midnight, and
+  // the window's own time zone.
+  const inWindows = (windows, timeZone, now) => {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone, weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    }).formatToParts(new Date(now))
+    const get = (t) => parts.find((p) => p.type === t)?.value
+    const weekday = { Sun: 7, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[get("weekday")]
+    const hour = Number(get("hour"))
+    const minute = Number(get("minute"))
+    if (!Number.isFinite(weekday) || !Number.isFinite(hour) || !Number.isFinite(minute)) return false
+    const mins = hour * 60 + minute
+    return windows.some((w) => Array.isArray(w?.weekdays) && w.weekdays.includes(weekday)
+      && Number.isFinite(w.start_minute) && Number.isFinite(w.end_minute)
+      && mins >= w.start_minute && mins < w.end_minute)
+  }
+
+
 // ---- reasoning levels --------------------------------------------------------------
 //
 // A list entry carries a reasoning_effort_config: the levels its model takes
@@ -3081,7 +3229,7 @@ const makePlugin = (site) => async ({ client }) => {
     const deviceId = ug && site.id === "trae-cn" ? await clientDevice(a.uid) : undefined
     const own = deviceId ? { deviceId, ...thisMachine() } : undefined
     // every other Trae CN account checks in on its own device, in the
-    // client's shape (ugDevice, #194)
+    // 15-digit shape Trae CN takes (ugDevice, #194, plugins#709)
     if (ug && site.id === "trae-cn" && !own) a = { ...a, deviceId: ugDevice(a) }
     const res = await fetch(url, {
       method,
@@ -3119,34 +3267,57 @@ const makePlugin = (site) => async ({ client }) => {
     const body = first.body
     if (body.checked_in) return { outcome: "done", ...(Number(body.credits) > 0 ? { credit: Number(body.credits) } : {}) }
     if (!body.enable) return { outcome: "inactive" }
-    const claim = await ownRequest(getAuth, a0, site.hosts.auth + site.checkin.claim.path, "POST", "{}")
-    const claimText = await claim.text()
-    let answer
-    try { answer = JSON.parse(claimText) } catch {}
-    const ce = errorOf(answer)
+    const read = async (res) => {
+      const text = await res.text()
+      let v
+      try { v = JSON.parse(text) } catch {}
+      return { claim: res, claimText: text, answer: v, ce: errorOf(v) }
+    }
+    let { claim, claimText, answer, ce } = await read(await ownRequest(getAuth, a0, site.hosts.auth + site.checkin.claim.path, "POST", "{}"))
+    // A 9074 on an account no Trae CN client here is signed in as is
+    // claimed once more, at once, as the tools that check such accounts in
+    // send it (clientShape, plugins#709, #722) — once, never on another
+    // code, and never for an account that rode its own client's device. A
+    // 9074 means Trae took nothing, so the second claim can't take the day
+    // twice; what it answers is the day's answer, read the same way.
+    let again = ""
+    if (String(ce.code) === "9074" && site.id === "trae-cn" && a0.uid && !(await clientDevice(a0.uid))) {
+      let a
+      try {
+        a = await fresh(getAuth)
+      } catch (e) {
+        if (!(e instanceof Expired)) throw e
+      }
+      if (a) {
+        ;({ claim, claimText, answer, ce } = await read(await fetch(site.hosts.auth + site.checkin.claim.path, { method: "POST", headers: clientShapeHeaders(a), body: "{}", signal: AbortSignal.timeout(20_000) })))
+        again = "; claimed again in the request Trae CN's client-less check-in tools send"
+      }
+    }
     if (claim.status === 401 || lapsedCode(ce.code, site)) return { outcome: "failed", message: ce.message || `${a0.name || a0.uid}: Trae's sign-in has expired` }
     // 9095: this device is in for today, whoever took it — the day's answer
-    if (String(ce.code) === "9095") return { outcome: "ineligible", message: `${ce.message || "this device has checked in today"} (${await deviceNote(a0.uid)})` }
+    if (String(ce.code) === "9095") return { outcome: "ineligible", message: `${ce.message || "this device has checked in today"} (${await deviceNote(a0.uid)}${again})` }
     // 9074: Trae did not take this claim for this account's device. Its own
     // words say the pool is busy, which measurements do not bear out: the
     // same account, token and headers were taken on a 16-digit id where a
-    // 19-digit one got 9074 (plugins#194), and on 2026-10-23 the same
+    // 19-digit one got 9074 (plugins#194), on 2026-10-23 the same
     // account and headers were taken on a device id Trae had never seen
-    // while this account's own id answered 9074. So the message says what
+    // while this account's own id answered 9074, and on 2026-11-05 a
+    // 16-digit id got 9074 where 15 digits were taken (plugins#709, so the
+    // claim goes on 15 now: ugDevice). So the message says what
     // Trae said and that the device is what it refused, rather than
     // sending people to check in in Trae CN's app, which is not where the
-    // problem is. No device id is made up or rotated to get round this:
-    // the account keeps its own until a client of its own is here to sign
-    // it in. Nothing is said of signing one in: it is the one thing seen
-    // to change a 9074, but it hasn't been tried on a real account, and
-    // on a claim that already rode a client's device it is what the user
-    // did — the advice would only send them back to do it again. What it
+    // problem is. Its own device is never rotated: an account with no
+    // client here gets one more claim in the client-less tools' request,
+    // on the one id they make from its uid (above), and nothing after
+    // that. Nothing is said of signing a client in: on a claim that
+    // already rode a client's device it is what the user did — the
+    // advice would only send them back to do it again. What it
     // does say, after both 9074 and 9095, is which device the claim went
     // on and why (deviceNote): moxuanchen (plugins#436) had to run
     // clientDevice by hand to learn that the account Trae CN took (A, 100
     // credits) rode the client's device and the one it refused 9074 (B)
     // rode magpie's own, since both of that machine's profiles were A's.
-    if (String(ce.code) === "9074") return { outcome: "ineligible", message: `${ce.message} (9074) — Trae CN did not take this check-in for this account's device (${await deviceNote(a0.uid)})` }
+    if (String(ce.code) === "9074") return { outcome: "ineligible", message: `${ce.message} (9074) — Trae CN did not take this check-in for this account's device (${await deviceNote(a0.uid)}${again})` }
     if (claim.status !== 200 || (ce.code && String(ce.code) !== "0")) return { outcome: "failed", message: ce.message || statusLine(claim.status) }
     if (!answer || typeof answer !== "object" || Array.isArray(answer)) return { outcome: "failed", message: `check-in claim: unreadable reply ${claimText.trim().slice(0, 120) || "(empty)"}` }
     // a claim's own code 0 is not proof the day is in: Trae answers it for
@@ -3402,6 +3573,7 @@ const makePlugin = (site) => async ({ client }) => {
       // for every model it hands over — so only a non-empty one is kept, or a
       // model in the fallback table would lose the levels its entry names.
       variants: Object.keys(was.variants ?? {}).length ? was.variants : variantsOf(levelsOf(m)),
+      ...traeRateOf(m),
     }
   }
 
@@ -3598,4 +3770,4 @@ const makePlugin = (site) => async ({ client }) => {
 export const TraeCNAuthPlugin = makePlugin(SITES["trae-cn"])
 export const TraeGlobalAuthPlugin = makePlugin(SITES["trae-global"])
 
-export const _internal = { ownClient, clientStoragePaths, clientDevice, clientProfiles, deviceNote, clientDecode, thisMachine, traeHost, accountOf, HOSTS: SITES["trae-cn"].hosts, MODELS: SITES["trae-cn"].models, TextTools, NativeCalls, looseJSON, glmCall, nameCall, toolNamed, unwrapped, traeMessages, chatBody, nativeTools, moonshotSchema, credits, dollarUsageOf, whenOf, newDevice, ugDevice, proofOf, SITES, SESSION, conversationID, LEVELS, levelsOf, variantsOf, effortOf }
+export const _internal = { ownClient, clientStoragePaths, clientDevice, clientProfiles, deviceNote, clientDecode, thisMachine, traeHost, accountOf, HOSTS: SITES["trae-cn"].hosts, MODELS: SITES["trae-cn"].models, TextTools, NativeCalls, looseJSON, glmCall, nameCall, toolNamed, unwrapped, traeMessages, chatBody, nativeTools, moonshotSchema, credits, dollarUsageOf, whenOf, newDevice, ugDevice, proofOf, SITES, SESSION, conversationID, LEVELS, levelsOf, variantsOf, effortOf, traeRateOf }

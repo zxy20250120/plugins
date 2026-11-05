@@ -294,7 +294,9 @@ and again, all day while the feed names no plan — one GET, nothing
 posted: ZCode drops plans into the feed on its own schedule (a weekend
 banner starting at 19:00 Beijing, say), and one that arrives
 after the day's ask used to sit unclaimed past its short life. The
-other answers stand for the day: a claimed plan leaves the feed, so
+other answers stand for the day — but an *ineligible* (code 1004, below)
+is read again in half an hour, as an inactive is: a claimed plan leaves
+the feed, so
 asking again half an hour later would find nothing and flip the card
 from "Checked in today" to "No check-in event now"; a captcha plan
 re-asked makes ZCode demand its captcha again; a done plan re-asked
@@ -313,6 +315,14 @@ the body's code, not the HTTP status:
   (11-03: seven accounts' ZCODE GLOBAL BUILD all answered 3007). Once
   claimed there, the gift lands on the account and freeFirst spends it
   like any other;
+- code 1004 "…not eligible for this plan yet" (HTTP 400): *ineligible*,
+  ZCode is not offering this account the plan at that moment. It is read
+  again half an hour out, since a plan can be offered later in the day
+  (11-04: an account's GLOBAL BUILD banner appeared 28 minutes after it
+  signed in). When *every* account answers 1004, check `APP_VERSION`
+  first: six accounts all answered 1004 under 3.16.3's header, and four
+  of them claimed with code 0 under 3.17.2's, one night, with nothing
+  else changed;
 - anything else, an HTTP error without a code, or a reply that isn't
   JSON: *failed*, which magpie asks again later that day. It is never
   taken as claimed, and a failed claim leaves the account's sign-in
@@ -349,9 +359,13 @@ plans add `-Trial` entries, which are told as read):
 | GLM-5-Turbo | 200K | 64K | none, high |
 
 The Start Plan's config has all of these except GLM-5.3. An account
-with no GLM Coding Plan also lists every model its gift plans serve under
-the model's own name, as ZCode does (the Start Plan's GLM-5.3 bucket makes
-GLM-5.3 a model), since all of its requests go to the gift anyway.
+with no GLM Coding Plan lists the models its gift plans' balance names,
+under each model's own name, as ZCode does (the Start Plan's GLM-5.3
+bucket makes GLM-5.3 a model), since all of its requests go to the gift
+anyway. A config model the balance doesn't name is left out: an account
+whose Start Plan holds only GLM-5.3-Flash lists GLM-5.3-Flash (and its
+-Trial entry), not GLM-5.2 or GLM-5-Turbo. Only a balance that names no
+model leaves the config's list standing.
 
 A gift plan's models appear again as `<model>-Trial` entries, so a
 request can spend the gift's quota on purpose. A trial entry is listed

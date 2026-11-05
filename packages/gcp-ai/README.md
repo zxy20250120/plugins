@@ -6,6 +6,10 @@
 
 You sign in once with your own Google account. No service accounts, no JSON keys, no extra packages: the plugin uses the Chrome you already have.
 
+## Token caching and request latency
+
+With an `authorized_user` ADC, the access token is cached per account until 60 seconds before it expires and refreshed directly against Google's OAuth token endpoint; concurrent callers share one in-flight refresh. In gcloud mode every token still comes from gcloud, unchanged. The endpoint check runs in the background, so it never sits in front of the first model call — only a rejected credential (401) is surfaced on later requests.
+
 ## Requirements
 
 - Google Chrome or Chromium (set `VERTEX_CHROME_PATH` if it is somewhere unusual)
@@ -32,7 +36,7 @@ that is why; macOS has likewise not been tried with a real account.
 ## Install and sign in
 
 ```bash
-magpie plugin add @magpie-community/gcp-ai
+magpie plugin add @magpie-community/opencode-gcp-ai-auth
 ```
 
 Then click sign in on the **GCP AI** row, or run:
@@ -55,7 +59,7 @@ Google has no API for promotional credits, so the balance is read from the Cloud
 ## What it keeps where
 
 - **Credentials**: never held by the plugin. gcloud writes them and prints tokens on demand.
-- **ADC directories**: `<config>/gcp-ai/adc-<account>`, one per Google account. The plugin never writes gcloud's own directory. Two addresses that differ only in punctuation would share a directory name, so the second one gets a short hash of its address appended (then a hash of its `sub`). Consent is first written to a private `adc-pending-*` directory and moved into place only after its `sub` is checked; that check and the move share a cross-process lock. A directory's name is storage only, never proof of whose account it is.
+- **ADC directories**: `<config>/gcp-ai/adc-<account>`, one per Google account. The plugin never writes gcloud's own directory. Two addresses that differ only in punctuation would share a directory name, so the second one gets a short hash of its address appended (then a hash of its `sub`). Consent is first written to a private `.adc-pending-*` directory and moved into place only after its `sub` is checked; that check and the move share a cross-process lock. A directory's name is storage only, never proof of whose account it is.
 - **Chrome profile**: `<config>/gcp-auto-profile`.
 - **Cache**: `<cache>/magpie/gcp-ai`.
 
@@ -77,7 +81,7 @@ Google has no API for promotional credits, so the balance is read from the Cloud
 - Each usage refresh asks Google's userinfo endpoint, with the account's own token, for its current email and `sub`. Google: `sub` is "unique among all Google Accounts and never reused", and "a Google Account can have multiple email addresses at different points in time, but the `sub` value is never changed".
 - The credits page is opened for the current email and the plugin checks the Google ID in Console's own page data against `sub`. A matching ID accepts the new email even while userinfo still returns the old one; a different ID is refused even when the emails match. Without IDs on the page the shown email must match.
 - A refresh whose token answers with a different (or no) `sub` than the one saved is refused: that is another Google account.
-- Saved per account: `googleSubject`, `consoleAccount` and `consoleSubject` (the confirmed current email and the `sub` it was confirmed for) and `credentialAccount` (the address gcloud keeps the credentials under, which does not follow a rename). `accountId` is not changed: it is the account's key in Magpie, which keeps the account's name, proxy, gateway key and quota history under it. The current email reaches Magpie as `usage().user`, which Magpie shows where it differs from the key.
+- Saved per account at sign-in: `googleSubject` and `accountId` (with a `#<hash>` suffix when two Google accounts share one email). `accountId` is not changed after a rename: it is the account's key in Magpie, which keeps the account's name, proxy, gateway key and quota history under it, and gcloud keeps the credentials under the original sign-in address (`credentialAccount`, `consoleAccount` and `consoleSubject` on older records are still read if present, while `usage()` never writes back to the host auth record). The current email is cached with the credits and reaches Magpie as `usage().user`, which Magpie shows where it differs from the key.
 - Console's ID fields are private page data, not a documented API; a page that names conflicting IDs is refused.
 
 If Console's ID cannot be read and the shown email differs, you can map the saved address to the current one in the `gcp-ai` provider's `options` (or the plugin's options; the provider's win). Confirm first that both addresses are the same Google account: the map only picks the Console session, and cannot override a `sub` mismatch.
@@ -139,3 +143,7 @@ A machine-wide `CLOUDSDK_CONFIG` is never read. It would point every account at 
 ## Privacy
 
 The plugin asks Google for your model list with your credentials, sends inference requests to the Vertex endpoint, and opens Cloud Console in a Chrome it started to read your credits. No third-party server, no credential upload, no debugging port.
+
+## Source and history
+
+The plugin's development history is at [github.com/Yaka88/google_vertex_plugin](https://github.com/Yaka88/google_vertex_plugin); releases are served from this repository.

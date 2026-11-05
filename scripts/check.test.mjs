@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { registryProblems } from "./registry.mjs"
+import { agentKindProblems, registryProblems } from "./registry.mjs"
 
 // Exercise the checker in a tiny independent repository, without loading any
 // real plugin, credential file or network client.
@@ -61,6 +61,43 @@ test("check still requires loaders for providers, including providers with tools
   }
 })
 
+test("check accepts account-scoped models without signing in or fetching them", () => {
+  const result = check(`export const Plugin = async () => ({
+    auth: {...${auth}, loader: async () => ({})},
+    config: async (cfg) => { cfg.provider.fixture = {npm: "@ai-sdk/openai", models: {}} },
+    provider: {id: "fixture", models() { throw new Error("must not ask for credentials") }}
+  })`, okRegistry,
+  { main: "./index.mjs", exports: { ".": "./opencode2.mjs" }, files: ["index.mjs", "opencode.mjs", "opencode2.mjs"] },
+  { "opencode.mjs": 'export { Plugin } from "./index.mjs"\n', "opencode2.mjs": adapter })
+  expect(result.code).toBe(0)
+  expect(result.output).toContain("✓ fixture")
+})
+
+test("check rejects missing, mismatched or non-callable account catalogs and still requires npm and a loader", () => {
+  for (const provider of ["undefined", '{id: "wrong", models() {}}', '{id: "fixture", models: {}}']) {
+    const result = check(`export const Plugin = async () => ({
+      auth: {...${auth}, loader: async () => ({})},
+      config: async (cfg) => { cfg.provider.fixture = {npm: "@ai-sdk/openai", models: {}} },
+      provider: ${provider}
+    })`)
+    expect(result.code).toBe(1)
+    expect(result.output).toContain("no npm or models")
+  }
+  for (const [npm, loader, problem] of [
+    ['"@ai-sdk/openai"', "undefined", "auth.loader"],
+    ["undefined", "async () => ({})", "no npm or models"],
+  ]) {
+    const result = check(`export const Plugin = async () => ({
+      auth: {...${auth}, loader: ${loader}},
+      config: async (cfg) => { cfg.provider.fixture = {npm: ${npm}, models: {}} },
+      provider: {id: "fixture", models() {}}
+    })`)
+    expect(result.code).toBe(1)
+    expect(result.output).toContain(problem)
+  }
+})
+
+
 const fine = `export const Plugin = async () => ({ tool: ${tool} })`
 
 test("check accepts quota-only providers with a loader and no model transport", () => {
@@ -95,6 +132,21 @@ test("quota hooks do not exempt incomplete model providers or missing loaders", 
 
 test("check passes this repository's own registry.json", () => {
   expect(registryProblems(readFileSync(new URL("../registry.json", import.meta.url), "utf8"))).toEqual([])
+})
+
+// a package that adds an agent is listed as one, with a Bun module
+// (main) beside it or not (#737): kimi-desktop and reasonix-desktop have one
+test("an agent package's entry is kind agent, main or not (#737)", () => {
+  const reg = (kind) => JSON.stringify({ version: 1, plugins: [{ package: "@magpie-community/agent-deva", name: "Deva", kind, summary: { en: "D", zh: "D" } }] })
+  const pkg = { name: "@magpie-community/agent-deva", main: "./index.mjs", magpie: { agent: "./deva.agent.js" } }
+  expect(agentKindProblems(reg("agent"), [pkg])).toEqual([])
+  expect(agentKindProblems(reg(undefined), [pkg])[0]).toContain('declares magpie.agent, but its entry\'s kind is null')
+  expect(agentKindProblems(reg("tools"), [pkg])).toHaveLength(1)
+  expect(agentKindProblems(reg(undefined), [{ ...pkg, magpie: {} }])).toEqual([])
+  const own = new URL("../packages/", import.meta.url)
+  const pkgs = ["kimi-desktop", "reasonix-desktop", "aider"].map((n) => JSON.parse(readFileSync(new URL(n + "/package.json", own), "utf8")))
+  expect(pkgs.filter((p) => p.main).length).toBe(2)
+  expect(agentKindProblems(readFileSync(new URL("../registry.json", import.meta.url), "utf8"), pkgs)).toEqual([])
 })
 
 test("check fails a registry.json that is not JSON (#612)", () => {
