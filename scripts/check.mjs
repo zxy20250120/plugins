@@ -7,15 +7,16 @@
 // sends no request. It checks registry.json first,
 // as magpie's Plugins page reads it (scripts/registry.mjs).
 import { readdirSync, readFileSync, existsSync } from "node:fs"
-import { join, resolve } from "node:path"
+import { join, resolve, dirname as _dn } from "node:path"
+import { fileURLToPath as _f2p } from "node:url"
 import { pathToFileURL } from "node:url"
 import { registryProblems } from "./registry.mjs"
 
-const root = resolve(import.meta.dir, "..", "packages")
+const root = resolve(_dn(_f2p(import.meta.url)), "..", "packages")
 const only = process.argv[2]
 let failed = 0
 {
-  const file = resolve(import.meta.dir, "..", "registry.json")
+  const file = resolve(_dn(_f2p(import.meta.url)), "..", "registry.json")
   const problems = existsSync(file) ? registryProblems(readFileSync(file, "utf8")) : ["registry.json is missing"]
   if (problems.length) failed++
   console.log(problems.length ? `✗ registry.json\n  ${problems.join("\n  ")}` : "✓ registry.json")
@@ -112,7 +113,7 @@ async function opencode2Problems(dir, pkg) {
   const d = mod.default
   if (!d || typeof d !== "object" || typeof d.id !== "string" || !d.id || (typeof d.setup !== "function" && typeof d.effect !== "function"))
     out.push(`OpenCode 2.x: ${entry} has no default {id, setup} (plugins#657)`)
-  const canon = resolve(import.meta.dir, "opencode2.mjs")
+  const canon = resolve(_dn(_f2p(import.meta.url)), "opencode2.mjs")
   const copy = join(dir, "opencode2.mjs")
   if (existsSync(copy) && existsSync(canon) && readFileSync(copy, "utf8") !== readFileSync(canon, "utf8"))
     out.push("opencode2.mjs differs from scripts/opencode2.mjs: copy it again")
