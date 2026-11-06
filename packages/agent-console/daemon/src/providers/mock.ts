@@ -277,6 +277,25 @@ async function scriptPerm(ctx: Ctx): Promise<void> {
   emit({ type: "assistant_message", itemId: "pm", text: "测试通过了。" });
 }
 
+// Like Cursor when its model stream dies ("http/2 stream closed … CANCEL"): it asks for permission, then ends the turn
+// itself without waiting for (or withdrawing) the answer. The manager must not keep the request pending afterwards.
+async function scriptPermAbandon(ctx: Ctx): Promise<void> {
+  const { emit } = ctx;
+  emit({
+    type: "permission_request",
+    requestId: "perm-" + rid(),
+    title: "运行 git status",
+    kind: "execute",
+    detail: { command: "git status" },
+    options: [
+      { id: "allow-once", label: tr("perm.allow"), kind: "allow_once" },
+      { id: "reject-once", label: tr("perm.deny"), kind: "reject_once" },
+    ],
+  });
+  await sleepAbortable(200, ctx);
+  emit({ type: "assistant_message", itemId: "pa", text: "Error: RetriableError: [canceled] http/2 stream closed with error code CANCEL (0x8)" });
+}
+
 async function scriptPlan(ctx: Ctx): Promise<void> {
   const { emit } = ctx;
   emit({
@@ -365,6 +384,27 @@ async function scriptLong(ctx: Ctx): Promise<void> {
   emit({ type: "assistant_message", itemId: "L1", text: "（5000 个增量合并后的长文）" });
 }
 
+// "/bigreply" (1.3.6 scroll e2e): one very long Markdown reply with many code blocks, far taller than the
+// 120px row estimate; streamed in chunks ("/bigreply slow" streams it over ~6 s)
+async function scriptBigReply(ctx: Ctx): Promise<void> {
+  const { emit } = ctx;
+  const slow = ctx.input.text.includes("slow");
+  const parts: string[] = [];
+  for (let i = 1; i <= 14; i++) {
+    parts.push(`### 第 ${i} 部分\n\n- 要点 ${i}.a：说明一下这里的改动\n- 要点 ${i}.b：以及为什么这样改\n\n`);
+    parts.push("```ts\n" + Array.from({ length: 8 }, (_, k) => `const v${i}_${k} = compute(${i}, ${k}); // line ${k}`).join("\n") + "\n```\n\n");
+  }
+  let acc = "";
+  emit({ type: "assistant_delta", itemId: "B1", text: "" });
+  for (const p of parts) {
+    if (ctx.interrupted()) return;
+    acc += p;
+    emit({ type: "assistant_delta", itemId: "B1", text: p });
+    await sleep(slow ? 220 : 5);
+  }
+  emit({ type: "assistant_message", itemId: "B1", text: acc });
+}
+
 async function scriptExit(_ctx: Ctx): Promise<void> {
   await sleep(300);
   throw new MockCrash();
@@ -372,6 +412,7 @@ async function scriptExit(_ctx: Ctx): Promise<void> {
 
 function pickScript(text: string): (ctx: Ctx) => Promise<void> {
   const t = text.trim();
+  if (t.startsWith("/perm-abandon")) return scriptPermAbandon;
   if (t.startsWith("/perm")) return scriptPerm;
   if (t.startsWith("/plan")) return scriptPlan;
   if (t.startsWith("/ask")) return scriptAsk;
@@ -379,6 +420,7 @@ function pickScript(text: string): (ctx: Ctx) => Promise<void> {
   if (t.startsWith("/error")) return scriptError;
   if (t.startsWith("/long")) return scriptLong;
   if (t.startsWith("/exit")) return scriptExit;
+  if (t.startsWith("/bigreply")) return scriptBigReply;
   if (t.startsWith("/serve")) return scriptServe;
   if (t.startsWith("/tools")) return scriptTools;
   if (t.startsWith("/bashhint")) return scriptBashHint;

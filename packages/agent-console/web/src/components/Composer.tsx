@@ -19,6 +19,7 @@ import { composerModeOptions, effortLabel } from "../i18n/modes.js";
 import { Logo } from "./Logo";
 import { currentChecklist, todoProgress } from "../timeline/fold";
 import { SelectMenu } from "./SelectMenu";
+import { AutoApproveBanner } from "./AutoApproveBanner";
 import { errMsg, t as tr, tf } from "../i18n/index.js";
 import {
   applySlashPick,
@@ -47,6 +48,9 @@ export function Composer() {
   const [agentPop, setAgentPop] = useState(false);
   const [pickerProviderId, setPickerProviderId] = useState<string | null>(null);
   const [modelQ, setModelQ] = useState("");
+  const [modelsRefreshing, setModelsRefreshing] = useState(false);
+  const modelsRefreshSeq = useRef(0);
+  const modelsForceSeq = useRef(0);
   const pickerRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -113,11 +117,40 @@ export function Composer() {
   const providerOk = (p: (typeof visibleProviders)[0]) =>
     p.enabled !== false && p.available && p.status !== "planned";
 
+  /** Soft sync (silent) or forced ↻ refresh; Magpie config mtime invalidates the daemon cache automatically.
+   *  Soft sync never disables ↻; a forced click is never coalesced onto an in-flight soft sync. */
+  const refreshModels = (opts?: { force?: boolean; provider?: string | null }) => {
+    const force = !!opts?.force;
+    const seq = ++modelsRefreshSeq.current;
+    let forceSeq = 0;
+    if (force) {
+      forceSeq = ++modelsForceSeq.current;
+      setModelsRefreshing(true);
+    }
+    const args: { refresh?: boolean; provider?: string } = {};
+    if (force) args.refresh = true;
+    if (opts?.provider) args.provider = opts.provider;
+    return (ws.call("providers.list", Object.keys(args).length ? args : undefined) as Promise<import("../types/models").ProviderInfo[]>)
+      .then((list) => {
+        if (seq !== modelsRefreshSeq.current) return; // a newer soft/force request won
+        useData.setState({ providers: list });
+      })
+      .catch(() => {})
+      .finally(() => {
+        // Soft sync must not clear (or leave stuck) the forced spinner
+        if (force && forceSeq === modelsForceSeq.current) setModelsRefreshing(false);
+      });
+  };
+
   const openPicker = (open: boolean) => {
     setAgentPop(open);
     if (open) {
       setPickerProviderId(null);
       setModelQ("");
+      // Opening the picker: silent soft sync (does not disable ↻)
+      void refreshModels({
+        provider: started ? (thread?.provider ?? null) : null,
+      });
     }
   };
 
@@ -397,8 +430,12 @@ export function Composer() {
   };
 
   const setMode = (m: Mode) => {
-    if (thread) void ws.call("thread.setMode", { id: thread.id, mode: m });
+    if (!thread) return;
+    void ws.call("thread.setMode", { id: thread.id, mode: m }).catch((e) => toast(errMsg(e), true));
   };
+  // 1.3 (#727 review 1): while the mode this Agent really uses is 全部自动同意, a persistent banner + warning-coloured chip
+  const autoOn = !!(modes.find((m) => m.id === mode) ?? modes[0])?.auto;
+  const canAsk = modes.some((m) => m.id === "default" && !m.auto);
   const setEffort = (effort: string | null) => {
     if (thread) void ws.call("thread.setEffort", { id: thread.id, effort });
   };
@@ -469,10 +506,8 @@ export function Composer() {
           ))}
         </div>
       )}
-      {mode === "bypassPermissions" && (
-        <div className="cp-danger">{tr("composer.bypassWarn")}</div>
-      )}
-      <div className={`cp-card${waiting ? " waiting" : ""}${mode === "bypassPermissions" ? " danger" : ""}${dropHint ? " drop-on" : ""}`}>
+      {autoOn && <AutoApproveBanner providerId={thread?.provider} onBack={canAsk ? () => setMode("default") : undefined} />}
+      <div className={`cp-card${waiting ? " waiting" : ""}${autoOn ? " auto-on" : ""}${dropHint ? " drop-on" : ""}`}>
         {dropHint && <div className="cp-drop-hint">{tr("mention.drop")}</div>}
         {imagesByPath && attachments.some((a) => a.mime.startsWith("image/")) && (
           <div className="att-note">{tf("composer.imagesByPath", { agent: provider?.name ?? "" })}</div>
@@ -587,6 +622,23 @@ export function Composer() {
                     value={modelQ}
                     onChange={(e) => setModelQ(e.target.value)}
                   />
+                  <button
+                    type="button"
+                    className={`ap-refresh${modelsRefreshing ? " spinning" : ""}`}
+                    title={modelsRefreshing ? tr("composer.refreshingModels") : tr("composer.refreshModels")}
+                    aria-label={tr("composer.refreshModels")}
+                    disabled={modelsRefreshing}
+                    onMouseDown={(ev) => ev.preventDefault()}
+                    onClick={() => {
+                      // Inside an Agent's model list: refresh only that provider (avoids waiting on every CLI)
+                      void refreshModels({
+                        force: true,
+                        provider: inModelList ? (pickerProviderId ?? thread?.provider ?? null) : null,
+                      });
+                    }}
+                  >
+                    <Icon name="refresh" size={14} />
+                  </button>
                 </div>
 
                 {modelQ.trim() ? (
@@ -728,13 +780,19 @@ export function Composer() {
               <ChipCaret />
             </SelectMenu>
           )}
-          {/* permission mode: list only the modes this Agent really has; hidden when there is only one (e.g. Pi has no modes) */}
+          {/* permission mode: list only the modes this Agent really has; one mode only (Pi: always auto) = a plain label */}
+          {modes.length === 1 && (
+            <span className={`pill ipill mode-chip static${modes[0]!.auto ? " auto" : ""}`} title={modes[0]!.desc} data-mode={modes[0]!.id}>
+              <Icon name={modes[0]!.auto ? "shieldCheck" : "shield"} size={14} />
+              <span className="ip-l">{modes[0]!.label}</span>
+            </span>
+          )}
           {modes.length > 1 && (() => {
             // The mode stored on the conversation doesn't exist for this Agent → show the one it will actually use
             const shown = modes.find((m) => m.id === mode) ?? modes[0]!;
             return (
               <SelectMenu
-                className={`pill ipill${shown.danger ? " danger" : ""}`}
+                className={`pill ipill mode-chip${shown.danger ? " danger" : ""}${shown.auto ? " auto" : ""}`}
                 title={shown.desc}
                 ariaLabel={tr("composer.modeTitle")}
                 prefer="up"
@@ -742,9 +800,9 @@ export function Composer() {
                 menuClassName="mode-menu"
                 value={shown.id}
                 onChange={(v) => setMode(v as Mode)}
-                options={modes.map((m) => ({ value: m.id, label: m.label, hint: m.desc, danger: m.danger }))}
+                options={modes.map((m) => ({ value: m.id, label: m.label, hint: m.desc, danger: m.danger, warn: m.auto, icon: m.auto ? "shieldCheck" : undefined }))}
               >
-                <Icon name="shield" size={14} />
+                <Icon name={shown.auto ? "shieldCheck" : "shield"} size={14} />
                 <span className="ip-l">{shown.label}</span>
                 <ChipCaret />
               </SelectMenu>

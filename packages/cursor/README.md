@@ -102,7 +102,11 @@ uses the same session/cache key and first user message as `conversation_id`, so
 Task subagents sharing their parent's session can run independently. A new
 user turn whose earlier native calls all have their results gets a retained Run
 of its own, with those calls as imported history; while any of them is still
-pending, the turn goes stateless. Retention
+pending, the turn goes stateless. New input after results already given (a
+reminder Claude Code sends beside a tool result reaches the plugin as a user
+message after it) also gets a retained Run of its own while a parent Run of
+the conversation still awaits results. That Run takes no reservation and
+leaves the parent alone; only its own calls' results resume it. Retention
 waits at most 120 seconds for a result batch and 15 minutes for a Run's total
 lifetime. A continuation arriving with less than 10 minutes of that lifetime
 left rebuilds from supplied history on a fresh Run before submitting results
@@ -131,14 +135,16 @@ Cursor's count of a step's tool calls includes calls the plugin answers itself:
 a tool the request doesn't have is refused to the model, and Cursor's own
 `get_mcp_tools` is answered with the request's tools. It also includes calls
 Cursor completes by itself, which it writes and completes in the step but never
-starts on the client or sends to it; those count toward it too. Once the count
-has come, a checkpoint whose state waits on exactly the calls the caller was
-given also ends the step (#550). The step's calls are the rest.
+starts on the client or sends to it; those count toward it too. When the count
+comes after the step's calls, a checkpoint whose state waits on exactly the
+calls the caller was given also ends the step (#550); a checkpoint between
+calls after a count sent ahead of them does not seal the batch early. The
+step's calls are the rest.
 
 These are retention limits. A missing, expired, restarted, busy, incompatible,
 or full owner uses the original history reconstruction and stateless decoder
-on a new Run. Pending parent calls and new input can take that path without
-cancelling the parent's owner. Already supplied client tool results become
+on a new Run. Pending parent calls can take that path without cancelling the
+parent's owner. Already supplied client tool results become
 history; the plugin never executes those external tools. A failed native result
 write is reported to that request because its outcome may be uncertain. A later
 request can rebuild from its supplied history without submitting the result to
@@ -155,12 +161,22 @@ stateless debt as `usage.magpie_deferred`, separately from its own prompt total.
 If a started native Run is abandoned after a pending handoff, its dashboard
 count is owed once to the same account and conversation. Successful final
 snapshots, including explicit zero, and cached replays do not enroll that debt.
+A Run still awaiting results when a later native Run of its conversation
+starts owes that count at once, for the later Run to collect, rather than at
+abandonment; what it had collected and not given out goes along. Cursor adds
+each step to a Run's one event as the step ends, so that event is looked for
+only `owedAt` (5 seconds) after the handover; a final waits for it. If its own
+results resume it after all, a count not collected yet is withdrawn, and one
+already collected comes off its final (from the earlier calls' share first),
+so the event is billed once.
 
 Dashboard attribution uses event timestamps, rather than when events arrive.
 Older debt is bounded strictly before the native Run's start, and keeps that
 bound across later stateless Runs so an authoritative native event is not
-billed again. An earlier event stamped on or after that boundary cannot be
-identified reliably and stays unknown. Missing or ambiguous debt expires after
+billed again. A Run abandoned after a later native Run of its conversation
+started owes with the same bound, before that later start. An earlier event
+stamped on or after that boundary cannot be identified reliably and stays
+unknown. Missing or ambiguous debt expires after
 10 minutes; at most 64 distinct bounded debt groups are kept per account and
 conversation, dropping the oldest on overflow. These counts are never guessed
 as prior usage. Stateless Runs otherwise keep the dashboard accounting above.

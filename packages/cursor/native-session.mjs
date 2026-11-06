@@ -495,6 +495,7 @@ export class StepCalls {
     this.execs = new Set() // the short strings of each exec's args: its tool_call_id among them
     this.partial = new Set() // calls the model is writing in this step
     this.byCursor = new Set()
+    this.listedAfter = false // whether tool_requests_listed came after the latest call/update
   }
   // update takes an InteractionUpdate's own field (num) and its fields; it
   // says whether a call was completed by Cursor: one this step wrote (7)
@@ -502,6 +503,7 @@ export class StepCalls {
   // completion of an earlier step's call is never counted again.
   update(n, uf) {
     if (n !== 2 && n !== 3 && n !== 7) return false
+    this.listedAfter = false
     const id = str(uf, 1)
     if (!id) return false
     if (n === 2) this.started.add(id)
@@ -512,14 +514,23 @@ export class StepCalls {
     return true
   }
   // exec notes an exec's args, whatever its kind: each kind keeps its
-  // tool_call_id at a field of its own (ShellArgs 4, ReadArgs 2, McpArgs 3)
+  // tool_call_id at a field of its own (ShellArgs 4, ReadArgs 2, McpArgs 3).
+  // If #3 came before its exec, it was not completed by Cursor after all.
   exec(data) {
+    this.listedAfter = false
     try {
       for (const e of this.parse(data)) {
         if (e.wire !== 2 || e.num === 15 || e.num === 19) continue
-        for (const a of this.parse(e.data)) if (a.wire === 2 && a.data.length && a.data.length <= 512) this.execs.add(a.data.toString("utf8"))
+        for (const a of this.parse(e.data)) if (a.wire === 2 && a.data.length && a.data.length <= 512) {
+          const s = a.data.toString("utf8")
+          this.execs.add(s)
+          this.byCursor.delete(s)
+        }
       }
     } catch {}
+  }
+  listed() {
+    this.listedAfter = true
   }
   get completed() {
     return this.byCursor.size
@@ -536,6 +547,7 @@ export class StepCalls {
   nextStep() {
     this.partial.clear()
     this.byCursor.clear()
+    this.listedAfter = false
   }
 }
 // pendingCalls is how many calls a checkpoint (ConversationStateStructure)
@@ -805,7 +817,15 @@ export class NativeSessionPool {
       const freshTurn = last?.role === "user" && !toolAttachment(last)
       if (!freshTurn || historical.some((c) => !answered.has(c.id))) return fallback("historical native calls")
     }
-    if (selector && this.selectors.has(account + ":" + selector)) return fallback("owner busy")
+    if (selector && this.selectors.has(account + ":" + selector)) {
+      if (!historical.length) return fallback("owner busy")
+      // New input after results the caller already gave its native calls
+      // (Claude Code sends a reminder beside a tool result, which a chat
+      // request carries as a user message after the tool message). The
+      // reservation's holder, a parent awaiting results, is left as it is:
+      // this Run takes no reservation, and only its own calls resume it.
+      return { account, selector, controls, selected: false, chat }
+    }
     return { account, selector, controls, selected: !!selector, chat }
   }
   create(prepared, resolution, wire) {
@@ -822,6 +842,17 @@ export class NativeSessionPool {
     catch (e) {
       if (!(e instanceof NativeSessionError)) throw e
       return null
+    }
+    // A Run of this conversation still live may be abandoned after this one
+    // starts: what it then owes is bounded before this start, so this Run's
+    // own dashboard events are never collected as its debt.
+    // One that waits on the caller's results owes its step now, for this
+    // Run to collect, rather than when it is abandoned at resultWait.
+    const at = Date.now()
+    for (const e of this.entries) {
+      if (e.account !== owner.account || !e.selector || e.selector !== owner.selector) continue
+      e.laterRunAt ??= at
+      if (e.state === "awaiting-results") e.accounting?.handover()
     }
     this.entries.add(owner)
     if (prepared.selected) this.selectors.set(owner.account + ":" + owner.selector, owner)
@@ -1004,6 +1035,9 @@ class NativeSession {
     batch.next = next
     this.segment = next
     this.state = "submitting"
+    // a step owed at a later Run's start and not collected yet is this Run's
+    // to count again, in its own final
+    this.accounting?.resumed()
     clearTimeout(this.resultTimer)
     clearTimeout(this.batchTimer)
     this.batchTimer = null
@@ -1104,11 +1138,15 @@ class NativeSession {
     this.sealBatch()
   }
   // A checkpoint whose state waits on just the calls handed to the caller,
-  // after the step's count, is a step Cursor has finished: what more the
-  // count says will not come (plugins#550).
+  // after the step's count came at the end of the step's calls, is a step
+  // Cursor has finished: what more the count says will not come (plugins#550).
+  // When the count was sent before or between the step's calls, a mid-batch
+  // checkpoint after an early call has only the calls sent so far in
+  // pending_tool_calls and must not seal the batch early before the
+  // remaining calls arrive.
   waitedOn(data) {
     const s = this.segment
-    if (this.terminal || this.state === "awaiting-results" || s.closed || s.expected == null || !s.calls.length) return
+    if (this.terminal || this.state === "awaiting-results" || s.closed || s.expected == null || !s.calls.length || !this.stepCalls.listedAfter) return
     if (pendingCalls(data) !== s.calls.length) return
     s.waitedOn = true
     this.sealBatch()
@@ -1123,6 +1161,7 @@ class NativeSession {
       return
     }
     this.segment.expected = count
+    this.stepCalls.listed()
     if (this.state === "awaiting-results") return // an identical retransmission
     this.waitForBatch()
     this.sealBatch()
@@ -1264,6 +1303,15 @@ class NativeSession {
       }
       earlier = { input: u.input - own.input, cacheRead: u.cacheRead - own.cacheRead, cacheWrite: u.cacheWrite - own.cacheWrite, output: u.output - own.output }
       Object.assign(u, own)
+    }
+    // What a later Run collected of this Run's event while this one waited on
+    // results (handover) is in the turn's totals too: it comes off them, from
+    // the earlier steps' share first, so the event counts once.
+    const counted = this.accounting?.counted?.()
+    if (counted) for (const k of ["input", "cacheRead", "cacheWrite", "output"]) {
+      const off = Math.min(earlier?.[k] ?? 0, counted[k] ?? 0)
+      if (earlier) earlier[k] -= off
+      u[k] = Math.max(0, u[k] - ((counted[k] ?? 0) - off))
     }
     const prompt = u.input + u.cacheRead + u.cacheWrite
     this.finalUsage = {

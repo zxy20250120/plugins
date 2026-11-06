@@ -147,6 +147,8 @@ var init_i18n = __esm({
         "notice.sessionStartFailed": "\u4F1A\u8BDD\u542F\u52A8\u5931\u8D25\uFF1A{detail}",
         "notice.sendFailed": "\u53D1\u9001\u5931\u8D25\uFF1A{detail}",
         "notice.bashMissing": "\u6CA1\u6709\u627E\u5230 Git Bash\u3002\u8FD9\u4E2A Agent \u5728 Windows \u4E0A\u8981\u7528 Git Bash \u8FD0\u884C\u547D\u4EE4\uFF08C:\\Windows\\System32\\bash.exe \u662F WSL \u542F\u52A8\u5668\uFF0C\u4E0D\u80FD\u7528\uFF09\u3002\u8BF7\u5B89\u88C5 Git for Windows\uFF1Ahttps://git-scm.com/download/win \uFF0C\u6216\u5728\u300C\u8BBE\u7F6E \u2192 Bash \u8DEF\u5F84\u300D\u91CC\u624B\u52A8\u6307\u5B9A bash.exe\u3002",
+        "notice.autoApproveUpgrade": "1.3 \u65B0\u589E\u300C\u5168\u90E8\u81EA\u52A8\u540C\u610F\u300D\uFF1A\u73B0\u5728\u5BF9 Cursor\u3001OpenCode\u3001dsh \u4E5F\u4F1A\u771F\u6B63\u81EA\u52A8\u540C\u610F\uFF081.2 \u7684\u300C\u5168\u90E8\u653E\u884C\u300D\u5BF9\u5B83\u4EEC\u4E0D\u751F\u6548\uFF0C\u4ECD\u4F1A\u8BE2\u95EE\uFF09\u3002\u4F60\u4E4B\u524D\u628A\u9ED8\u8BA4\u6743\u9650\u6A21\u5F0F\u8BBE\u6210\u4E86\u5B83\uFF0C\u4E3A\u5B89\u5168\u8D77\u89C1\u8FD9\u4E2A\u5BF9\u8BDD\u4ECD\u4ECE\u300C\u6BCF\u6B21\u8BE2\u95EE\u300D\u5F00\u59CB\uFF1B\u9700\u8981\u65F6\u8BF7\u5728\u4E0B\u65B9\u6743\u9650\u83DC\u5355\u91CC\u624B\u52A8\u5F00\u542F\uFF0C\u6216\u5728\u8BBE\u7F6E\u91CC\u91CD\u65B0\u9009\u62E9\u9ED8\u8BA4\u6743\u9650\u6A21\u5F0F\u3002",
+        "notice.autoApproveMigrated": "\u8FD9\u4E2A\u5BF9\u8BDD\u5728 1.2 \u91CC\u8BBE\u6210\u4E86\u300C\u5168\u90E8\u653E\u884C\u300D\uFF0C\u5F53\u65F6\u8FD9\u4E2A Agent \u5B9E\u9645\u4ECD\u4F1A\u8BE2\u95EE\u30021.3 \u8D77\u300C\u5168\u90E8\u81EA\u52A8\u540C\u610F\u300D\u4F1A\u771F\u6B63\u81EA\u52A8\u540C\u610F\uFF0C\u6240\u4EE5\u5DF2\u6539\u56DE\u300C\u6BCF\u6B21\u8BE2\u95EE\u300D\uFF1B\u9700\u8981\u65F6\u8BF7\u5728\u4E0B\u65B9\u6743\u9650\u83DC\u5355\u91CC\u624B\u52A8\u5F00\u542F\u3002",
         "notice.effortNextTurn": "\u601D\u8003\u5F3A\u5EA6\u5DF2\u4FDD\u5B58\uFF0C\u5C06\u5728\u4E0B\u4E00\u8F6E\u751F\u6548",
         "notice.effortResetOnModel": "\u5F53\u524D\u6A21\u578B\u4E0D\u652F\u6301\u8BE5\u601D\u8003\u5F3A\u5EA6\uFF0C\u5DF2\u6062\u590D\u4E3A Default",
         "turn.agentExit": "Agent \u8FDB\u7A0B\u610F\u5916\u9000\u51FA",
@@ -258,6 +260,8 @@ var init_i18n = __esm({
         "notice.sessionStartFailed": "Session start failed: {detail}",
         "notice.sendFailed": "Send failed: {detail}",
         "notice.bashMissing": "Git Bash was not found. On Windows this agent runs its commands with Git Bash (C:\\Windows\\System32\\bash.exe is the WSL launcher and won't work). Install Git for Windows: https://git-scm.com/download/win , or set bash.exe under Settings \u2192 Bash path.",
+        "notice.autoApproveUpgrade": "New in 1.3: Auto-approve all now really auto-approves for Cursor, OpenCode and dsh too (1.2's bypass mode did nothing for them; they still asked). Your default permission mode was set to it, so to be safe this conversation starts in Always Ask; switch it on in the permission menu below if you want it, or pick the default permission mode again in Settings.",
+        "notice.autoApproveMigrated": "This conversation was set to bypass permissions in 1.2, where this agent still asked anyway. From 1.3 Auto-approve all really auto-approves, so it was put back to Always Ask; switch it on in the permission menu below if you want it.",
         "notice.effortNextTurn": "Reasoning effort saved \u2014 takes effect on the next turn",
         "notice.effortResetOnModel": "This model does not support that effort level; reset to Default",
         "turn.agentExit": "Agent process exited unexpectedly",
@@ -708,6 +712,22 @@ async function scriptPerm(ctx) {
   emit({ type: "tool_call", itemId: "p1", kind: "bash", title: "\u8FD0\u884C npm test", status: "ok", output: "\u2713 12 \u4E2A\u6D4B\u8BD5\u901A\u8FC7", exitCode: 0, durationMs: 500 });
   emit({ type: "assistant_message", itemId: "pm", text: "\u6D4B\u8BD5\u901A\u8FC7\u4E86\u3002" });
 }
+async function scriptPermAbandon(ctx) {
+  const { emit } = ctx;
+  emit({
+    type: "permission_request",
+    requestId: "perm-" + rid(),
+    title: "\u8FD0\u884C git status",
+    kind: "execute",
+    detail: { command: "git status" },
+    options: [
+      { id: "allow-once", label: tr("perm.allow"), kind: "allow_once" },
+      { id: "reject-once", label: tr("perm.deny"), kind: "reject_once" }
+    ]
+  });
+  await sleepAbortable(200, ctx);
+  emit({ type: "assistant_message", itemId: "pa", text: "Error: RetriableError: [canceled] http/2 stream closed with error code CANCEL (0x8)" });
+}
 async function scriptPlan(ctx) {
   const { emit } = ctx;
   emit({
@@ -791,12 +811,36 @@ async function scriptLong(ctx) {
   }
   emit({ type: "assistant_message", itemId: "L1", text: "\uFF085000 \u4E2A\u589E\u91CF\u5408\u5E76\u540E\u7684\u957F\u6587\uFF09" });
 }
+async function scriptBigReply(ctx) {
+  const { emit } = ctx;
+  const slow = ctx.input.text.includes("slow");
+  const parts = [];
+  for (let i = 1; i <= 14; i++) {
+    parts.push(`### \u7B2C ${i} \u90E8\u5206
+
+- \u8981\u70B9 ${i}.a\uFF1A\u8BF4\u660E\u4E00\u4E0B\u8FD9\u91CC\u7684\u6539\u52A8
+- \u8981\u70B9 ${i}.b\uFF1A\u4EE5\u53CA\u4E3A\u4EC0\u4E48\u8FD9\u6837\u6539
+
+`);
+    parts.push("```ts\n" + Array.from({ length: 8 }, (_, k) => `const v${i}_${k} = compute(${i}, ${k}); // line ${k}`).join("\n") + "\n```\n\n");
+  }
+  let acc = "";
+  emit({ type: "assistant_delta", itemId: "B1", text: "" });
+  for (const p of parts) {
+    if (ctx.interrupted()) return;
+    acc += p;
+    emit({ type: "assistant_delta", itemId: "B1", text: p });
+    await sleep(slow ? 220 : 5);
+  }
+  emit({ type: "assistant_message", itemId: "B1", text: acc });
+}
 async function scriptExit(_ctx) {
   await sleep(300);
   throw new MockCrash();
 }
 function pickScript(text) {
   const t = text.trim();
+  if (t.startsWith("/perm-abandon")) return scriptPermAbandon;
   if (t.startsWith("/perm")) return scriptPerm;
   if (t.startsWith("/plan")) return scriptPlan;
   if (t.startsWith("/ask")) return scriptAsk;
@@ -804,6 +848,7 @@ function pickScript(text) {
   if (t.startsWith("/error")) return scriptError;
   if (t.startsWith("/long")) return scriptLong;
   if (t.startsWith("/exit")) return scriptExit;
+  if (t.startsWith("/bigreply")) return scriptBigReply;
   if (t.startsWith("/serve")) return scriptServe;
   if (t.startsWith("/tools")) return scriptTools;
   if (t.startsWith("/bashhint")) return scriptBashHint;
@@ -2418,6 +2463,12 @@ var init_cli = __esm({
       exited;
       /** The answer to initialize (commands, models, account …), null when it failed */
       initialized;
+      /** Monotonic turn gen for THIS process (dies with the CLI). */
+      turnGen = 0;
+      /** Turn gens still waiting for a `result` from THIS process (dies with the CLI). */
+      awaitingResult = [];
+      /** Gens already ended locally on interrupt; their late `result` must be dropped. */
+      skipResultGens = /* @__PURE__ */ new Set();
       child;
       buf = "";
       seq = 0;
@@ -2627,7 +2678,14 @@ var init_session = __esm({
       }
       async pump(cli) {
         for await (const m of cli.messages) {
-          for (const ev of mapSdkMessage(m, this.st, this.o.cwd)) this.emit(ev);
+          if (this.cli !== cli) continue;
+          for (const ev of mapSdkMessage(m, this.st, this.o.cwd)) {
+            if (ev.type === "turn_ended") {
+              const g = cli.awaitingResult.shift();
+              if (g != null && cli.skipResultGens.delete(g)) continue;
+            }
+            this.emit(ev);
+          }
         }
         const exit = await cli.exited;
         if (this.closed || this.stopping.has(cli)) return;
@@ -2638,7 +2696,6 @@ var init_session = __esm({
         this.turnId = null;
         if (this.cli === cli) {
           this.needsRestart = true;
-          this.q.close();
         }
       }
       emit(ev) {
@@ -2652,6 +2709,8 @@ var init_session = __esm({
         if (this.needsRestart) await this.restart();
         const cli = this.ensureCli();
         this.turnNum++;
+        const gen = ++cli.turnGen;
+        cli.awaitingResult.push(gen);
         this.turnId = "u_" + Date.now().toString(36) + "_" + this.turnNum;
         this.st.sawInterrupt = false;
         this.emit({
@@ -2805,7 +2864,17 @@ var init_session = __esm({
         }
         this.pending.clear();
         const cli = this.cli;
-        if (!cli || !cli.alive) return;
+        const endLocal = () => {
+          if (this.turnId) {
+            const gen = cli?.awaitingResult.at(-1);
+            if (gen != null) cli.skipResultGens.add(gen);
+            this.emit({ type: "turn_ended", turnId: this.turnId, status: "interrupted" });
+          }
+        };
+        if (!cli || !cli.alive) {
+          endLocal();
+          return;
+        }
         try {
           await cli.interrupt();
         } catch (e) {
@@ -2813,8 +2882,12 @@ var init_session = __esm({
           this.stopping.add(cli);
           this.needsRestart = true;
           void cli.close(500);
-          if (this.turnId) this.emit({ type: "turn_ended", turnId: this.turnId, status: "interrupted" });
+          if (this.turnId) {
+            this.emit({ type: "turn_ended", turnId: this.turnId, status: "interrupted" });
+          }
+          return;
         }
+        endLocal();
       }
       async setModel(model) {
         this.o.model = model;
@@ -3832,18 +3905,32 @@ var init_session2 = __esm({
       pending = /* @__PURE__ */ new Map();
       closed = false;
       started = null;
-      interruptWanted = false;
       ourTurnId = null;
       // The current turn's turnId in the timeline (generated on send)
+      /** Codex turn ids whose late started/completed/deltas must be ignored. */
       staleCodexTurns = /* @__PURE__ */ new Set();
       codexSlash = null;
       emit(ev) {
         if (ev.type === "turn_ended") {
-          if (ev.turnId && this.staleCodexTurns.delete(ev.turnId)) return;
-          if (this.ourTurnId) ev.turnId = this.ourTurnId;
-          this.ourTurnId = null;
-          this.st.currentTurnId = null;
-          this.interruptWanted = false;
+          if (ev.turnId && this.staleCodexTurns.delete(ev.turnId)) {
+            if (this.st.currentTurnId === ev.turnId) this.st.currentTurnId = null;
+            return;
+          }
+          if (this.ourTurnId) {
+            if (!ev.turnId || ev.turnId === this.st.currentTurnId || ev.turnId === this.ourTurnId) {
+              ev.turnId = this.ourTurnId;
+            } else {
+              return;
+            }
+            this.ourTurnId = null;
+            this.st.currentTurnId = null;
+          } else {
+            if (ev.turnId) {
+              this.staleCodexTurns.delete(ev.turnId);
+              if (this.st.currentTurnId === ev.turnId) this.st.currentTurnId = null;
+            }
+            return;
+          }
         }
         this.q.push(ev);
       }
@@ -3859,8 +3946,18 @@ var init_session2 = __esm({
           );
           this.rpc = rpc;
           rpc.onNotification = (m, p) => {
+            const turnFromParams = () => {
+              const turn = p?.turn;
+              if (typeof turn?.id === "string") return turn.id;
+              if (typeof p.turnId === "string") return p.turnId;
+              return null;
+            };
+            const tid = turnFromParams();
+            if (tid && this.staleCodexTurns.has(tid)) {
+              if (m === "turn/completed") this.staleCodexTurns.delete(tid);
+              return;
+            }
             for (const ev of mapNotification(m, p, this.st)) this.emit(ev);
-            if (this.interruptWanted && this.st.currentTurnId) void this.interrupt();
           };
           rpc.onServerRequest = (m, p) => this.onServerRequest(m, p);
           rpc.onExit = () => {
@@ -3924,7 +4021,6 @@ var init_session2 = __esm({
         this.codexSlash = entries;
         const wireText = expandCodexSlash(input.text, entries);
         const { items, warnings } = await buildCodexInput(wireText, input.images ?? []);
-        this.interruptWanted = false;
         const turnId = "u_" + Date.now().toString(36) + "_" + rid3();
         if (this.ourTurnId && this.st.currentTurnId) this.staleCodexTurns.add(this.st.currentTurnId);
         this.ourTurnId = turnId;
@@ -3938,7 +4034,7 @@ var init_session2 = __esm({
         });
         for (const w of warnings) this.emit({ type: "notice", level: "warn", message: tr("notice.attachmentIssue", { detail: w }) });
         try {
-          await rpc.request("turn/start", {
+          const res = await rpc.request("turn/start", {
             threadId: this.sessionThreadId ?? void 0,
             input: items,
             model: this.o.model,
@@ -3946,7 +4042,26 @@ var init_session2 = __esm({
             approvalPolicy: preset.approvalPolicy,
             sandboxPolicy: preset.sandboxPolicy
           });
+          const codexTurnId = typeof res?.turn?.id === "string" ? res.turn.id : null;
+          if (!codexTurnId) return;
+          const wasCancelled = this.ourTurnId !== turnId;
+          if (wasCancelled) {
+            this.staleCodexTurns.add(codexTurnId);
+            try {
+              await rpc.request(
+                "turn/interrupt",
+                { threadId: this.threadId(), turnId: codexTurnId },
+                5e3
+              );
+            } catch (e) {
+              const msg = String(e?.message ?? e);
+              if (!/idle|not running|no.*turn/i.test(msg)) log("warn", "codex interrupt \u5931\u8D25", { err: msg });
+            }
+            return;
+          }
+          this.st.currentTurnId = codexTurnId;
         } catch (e) {
+          if (this.ourTurnId !== turnId) return;
           this.emit({
             type: "turn_ended",
             turnId,
@@ -3972,23 +4087,29 @@ var init_session2 = __esm({
       async interrupt() {
         for (const [, p] of this.pending) p.resolve({ cancelled: true });
         this.pending.clear();
-        if (!this.rpc) return;
-        if (!this.st.currentTurnId) {
-          this.interruptWanted = true;
+        const localTurn = this.ourTurnId;
+        const codexTurn = this.st.currentTurnId;
+        if (!this.rpc) {
+          if (localTurn) this.emit({ type: "turn_ended", turnId: localTurn, status: "interrupted" });
           return;
         }
-        this.interruptWanted = false;
-        try {
-          await this.rpc.request(
-            "turn/interrupt",
-            { threadId: this.threadId(), turnId: this.st.currentTurnId },
-            5e3
-          );
-        } catch (e) {
-          const msg = String(e?.message ?? e);
-          if (!/idle|not running|no.*turn/i.test(msg)) {
-            log("warn", "codex interrupt \u5931\u8D25", { err: msg });
+        if (codexTurn) {
+          this.staleCodexTurns.add(codexTurn);
+          try {
+            await this.rpc.request(
+              "turn/interrupt",
+              { threadId: this.threadId(), turnId: codexTurn },
+              5e3
+            );
+          } catch (e) {
+            const msg = String(e?.message ?? e);
+            if (!/idle|not running|no.*turn/i.test(msg)) {
+              log("warn", "codex interrupt \u5931\u8D25", { err: msg });
+            }
           }
+        }
+        if (localTurn && this.ourTurnId === localTurn) {
+          this.emit({ type: "turn_ended", turnId: localTurn, status: "interrupted" });
         }
       }
       threadId() {
@@ -4107,8 +4228,11 @@ var init_types = __esm({
 
 // daemon/src/providers/codex/provider.ts
 import { homedir as homedir7 } from "node:os";
-import { join as join9 } from "node:path";
+import { dirname as dirname3, isAbsolute as isAbsolute2, join as join9 } from "node:path";
 import { readFile as readFile8 } from "node:fs/promises";
+function clearCodexModelCache() {
+  modelCache = null;
+}
 function runVersion2(r, args, timeoutMs = 5e3) {
   return new Promise((resolvePromise, reject) => {
     let out = "";
@@ -4134,7 +4258,8 @@ function runVersion2(r, args, timeoutMs = 5e3) {
 function normalizeEfforts(raw) {
   const out = [];
   for (const e of raw ?? []) {
-    const v = typeof e === "string" ? e : e?.reasoningEffort;
+    const o = e;
+    const v = typeof e === "string" ? e : o?.reasoningEffort ?? o?.effort;
     if (typeof v === "string" && v && !out.includes(v)) out.push(v);
   }
   return out;
@@ -4197,6 +4322,7 @@ function parseCodexConfig(text) {
   const profileValue = (key) => profileName ? values.get(`profiles.${profileName}\0${key}`) : void 0;
   const modelProvider = profileValue("model_provider") ?? top("model_provider");
   const model = profileValue("model") ?? top("model");
+  const catalog = profileValue("model_catalog_json") ?? top("model_catalog_json");
   const provider = typeof modelProvider === "string" ? modelProvider : null;
   const models2 = /* @__PURE__ */ new Set();
   if (typeof model === "string" && model) models2.add(model);
@@ -4205,15 +4331,69 @@ function parseCodexConfig(text) {
       for (const m of value) models2.add(m);
     }
   }
-  return { modelProvider: provider, model: typeof model === "string" ? model : null, providerModels: [...models2] };
+  return {
+    modelProvider: provider,
+    model: typeof model === "string" ? model : null,
+    providerModels: [...models2],
+    catalogJson: typeof catalog === "string" && catalog.trim() ? catalog.trim() : null
+  };
+}
+function resolveCatalogPath(raw, configDir, home = homedir7()) {
+  let p = raw.trim();
+  const env = p.match(/^(?:\$HOME|\$\{HOME\})(?=$|[\\/])/);
+  if (env) p = home + p.slice(env[0].length);
+  else if (p === "~") p = home;
+  else if (/^~[\\/]/.test(p)) p = join9(home, p.slice(2));
+  return isAbsolute2(p) ? p : join9(configDir, p);
+}
+function parseCodexCatalog(text) {
+  const doc = JSON.parse(text);
+  if (!Array.isArray(doc?.models)) return [];
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const raw of doc.models) {
+    const m = raw;
+    if (!m || typeof m.slug !== "string" || !m.slug || seen.has(m.slug)) continue;
+    if (typeof m.visibility === "string" && m.visibility !== "list") continue;
+    seen.add(m.slug);
+    const efforts = normalizeEfforts(Array.isArray(m.supported_reasoning_levels) ? m.supported_reasoning_levels : void 0);
+    const thinkingOptions = efforts.map((e) => ({ id: e, label: e }));
+    const def = typeof m.default_reasoning_level === "string" && efforts.includes(m.default_reasoning_level) ? m.default_reasoning_level : null;
+    const name = typeof m.display_name === "string" && m.display_name.trim() ? m.display_name.trim() : m.slug;
+    out.push({ id: m.slug, name, efforts, thinkingOptions, defaultThinking: def ?? thinkingOptions[0]?.id ?? null });
+  }
+  return out;
+}
+async function codexProviderModels(config, configDir, home = homedir7()) {
+  let rows = [];
+  if (config.catalogJson) {
+    const file = resolveCatalogPath(config.catalogJson, configDir, home);
+    try {
+      rows = parseCodexCatalog(await readFile8(file, "utf8"));
+    } catch (e) {
+      log("warn", "codex model_catalog_json \u8BFB\u53D6\u5931\u8D25", { file, err: String(e) });
+    }
+  }
+  const ids = new Set(rows.map((r) => r.id));
+  for (const id2 of config.providerModels) {
+    if (!ids.has(id2)) {
+      ids.add(id2);
+      rows.push({ id: id2, name: id2 });
+    }
+  }
+  if (config.model && !rows.some((r) => r.id === config.model)) rows.unshift({ id: config.model, name: config.model });
+  const def = config.model ?? rows[0]?.id;
+  return rows.map((r) => ({ ...r, isDefault: r.id === def }));
+}
+function codexConfigFile() {
+  const home = process.env.CODEX_HOME?.trim() || join9(homedir7(), ".codex");
+  return home.toLowerCase().endsWith(".toml") ? home : join9(home, "config.toml");
 }
 async function readCodexConfig() {
-  const home = process.env.CODEX_HOME?.trim() || join9(homedir7(), ".codex");
-  const file = home.toLowerCase().endsWith(".toml") ? home : join9(home, "config.toml");
   try {
-    return parseCodexConfig(await readFile8(file, "utf8"));
+    return parseCodexConfig(await readFile8(codexConfigFile(), "utf8"));
   } catch {
-    return { modelProvider: null, model: null, providerModels: [] };
+    return { modelProvider: null, model: null, providerModels: [], catalogJson: null };
   }
 }
 function isChatGptProvider(id2) {
@@ -4239,7 +4419,7 @@ function createCodexProvider(version) {
     async listModels(launch) {
       const config = await readCodexConfig();
       if (!isChatGptProvider(config.modelProvider)) {
-        const rows = config.providerModels.map((id2, i) => ({ id: id2, name: id2, isDefault: i === 0 }));
+        const rows = await codexProviderModels(config, dirname3(codexConfigFile()));
         return rows.length ? rows : [{ id: "", name: `${PLACEHOLDER_MODEL_NAME} (${config.modelProvider})`, isDefault: true }];
       }
       if (!launch && modelCache && Date.now() - modelCache.at < MODEL_CACHE_MS) return modelCache.models;
@@ -4400,7 +4580,7 @@ function registerAcpClientHandlers(app, bridge) {
       detail: tc.rawInput ?? void 0,
       options
     });
-    const answer = await bridge.waitFor(requestId);
+    const answer = await bridge.waitFor(requestId, ctx.signal);
     if (answer.cancelled) return { outcome: { outcome: "cancelled" } };
     const optionId = answer.optionId ?? options[0]?.id;
     if (!optionId) return { outcome: { outcome: "cancelled" } };
@@ -4700,6 +4880,11 @@ var init_session3 = __esm({
       turnId = null;
       turnNum = 0;
       running = false;
+      /** Current wire session/prompt settle (never rejects) — interrupt waits for it before the next prompt. */
+      inFlightPrompt = null;
+      /** After Stop: notify(cancel) + previous prompt settle + one macrotask, so pumpUpdates drains before next prompt(). */
+      pendingCancelSettle = null;
+      closeWaiters = [];
       permPending = /* @__PURE__ */ new Map();
       mapCtx = newMapCtx();
       modelConfigId = null;
@@ -4736,7 +4921,7 @@ var init_session3 = __esm({
           const app = client({ name: "magpie-agent-console" });
           registerAcpClientHandlers(app, {
             push: (ev) => this.q.push(ev),
-            waitFor: (id2) => this.waitPerm(id2),
+            waitFor: (id2, signal) => this.waitPerm(id2, signal),
             autoAcceptPermissions: () => this.cursorAutoReview
           });
           const stream = acpStreamFromChild(this.child);
@@ -4871,7 +5056,7 @@ var init_session3 = __esm({
           return hit?.id ?? want;
         }
         if (this.o.flavor === "cursor") {
-          const map = { default: "agent", plan: "plan", ask: "ask" };
+          const map = { default: "agent", bypassPermissions: "agent", plan: "plan", ask: "ask" };
           const want = map[mode2] ?? "agent";
           const avail = this.active?.modes?.availableModes ?? [];
           const hit = avail.find((m) => m.id === want || m.name.toLowerCase() === want);
@@ -4909,22 +5094,26 @@ var init_session3 = __esm({
        * Switch model → refresh level options from the new config options it returns → then apply the level (as Paseo does).
        * Cursor connects with parameterizedModelPicker: only the base model name is sent (grok-4.6); level / Fast are separate config options.
        */
-      async applySessionModel(model) {
-        if (!this.ctx || !this.active) return;
+      /** false = the model id was skipped (not in the session's model options and not forced) */
+      async applySessionModel(model, force = false) {
+        if (!this.ctx || !this.active) return false;
+        let applied = true;
         const value = model && this.o.flavor === "cursor" ? model.replace(/\[.*\]$/u, "") : model;
         if (value) {
           const modelOption = this.currentConfig().find((o) => o.id === (this.modelConfigId ?? "model"));
           const values = (modelOption?.options ?? []).flatMap((x) => x.options ? x.options : [x]).map((x) => x.value).filter((x) => typeof x === "string");
-          if (!values.length || values.includes(value)) {
+          if (force || !values.length || values.includes(value)) {
             await this.setOption(this.modelConfigId ?? "model", value);
           } else {
             log("info", `\u5FFD\u7565 ${this.o.binName} \u7684\u65E0\u6548\u6A21\u578B\uFF1A${value}`);
+            applied = false;
           }
         }
         if (this.o.flavor === "cursor" && this.cursorFast && this.currentConfig().some((o) => o.id === "fast")) {
           await this.setOption("fast", "true");
         }
         await this.applySessionThought(this.o.effort);
+        return applied;
       }
       async applyCursorAutoReviewConfig(on) {
         if (this.o.flavor !== "cursor" || !this.ctx || !this.active) return;
@@ -4949,10 +5138,20 @@ var init_session3 = __esm({
         await this.applySessionModel(this.o.model);
         await this.applyCursorAutoReviewConfig(false);
       }
-      waitPerm(requestId) {
+      waitPerm(requestId, signal) {
         return new Promise((resolve4) => {
           this.permPending.set(requestId, resolve4);
+          if (signal?.aborted) this.cancelPerm(requestId);
+          else signal?.addEventListener("abort", () => this.cancelPerm(requestId), { once: true });
         });
+      }
+      /** Close an open permission request as cancelled (answer the Agent's request and tell the manager) */
+      cancelPerm(requestId) {
+        const r = this.permPending.get(requestId);
+        if (!r) return;
+        this.permPending.delete(requestId);
+        r({ cancelled: true });
+        this.q.push({ type: "permission_resolved", requestId, cancelled: true });
       }
       respond(requestId, answer) {
         const r = this.permPending.get(requestId);
@@ -4971,12 +5170,12 @@ var init_session3 = __esm({
         await this.ready();
         if (this.running) throw new Error("\u5F53\u524D\u8F6E\u6B21\u5C1A\u672A\u7ED3\u675F");
         this.turnNum++;
-        this.turnId = "u_" + Date.now().toString(36) + "_" + this.turnNum;
-        this.mapCtx = newMapCtx();
+        const turnId = "u_" + Date.now().toString(36) + "_" + this.turnNum;
+        this.turnId = turnId;
         this.running = true;
         this.q.push({
           type: "turn_started",
-          turnId: this.turnId,
+          turnId,
           model: this.o.model,
           mode: this.o.mode,
           effort: this.o.effort
@@ -4985,10 +5184,11 @@ var init_session3 = __esm({
         const attachments = input.images ?? [];
         if (!text && !attachments.length) {
           this.running = false;
-          this.q.push({ type: "turn_ended", turnId: this.turnId, status: "completed" });
+          this.q.push({ type: "turn_ended", turnId, status: "completed" });
           return;
         }
         const built = await buildAcpPrompt(text, attachments, this.promptCaps, input.mentions ?? []);
+        if (this.closed || !this.running || this.turnId !== turnId) return;
         const agent = this.o.providerName ?? this.o.binName;
         if (built.imagesByPath.length && !this.promptCaps.image) {
           const switched = this.o.imagesFollowStartModel && this.initCaps.image && this.o.model !== this.startModel;
@@ -4996,21 +5196,68 @@ var init_session3 = __esm({
         }
         for (const w of built.warnings) this.q.push({ type: "notice", level: "warn", message: tr("notice.attachmentIssue", { detail: w }) });
         if (!built.blocks.length) {
-          this.running = false;
-          this.q.push({ type: "turn_ended", turnId: this.turnId, status: "completed" });
+          if (this.turnId === turnId && this.running) {
+            this.running = false;
+            this.q.push({ type: "turn_ended", turnId, status: "completed" });
+          }
           return;
         }
-        void this.runTurn(built.blocks);
+        void this.runTurn(turnId, built.blocks);
       }
-      // Send this turn's prompt; reading updates is the job of the persistent pumpUpdates() (following Paseo: session/update is handled at session level)
-      async runTurn(prompt) {
-        this.activeTurnId = this.turnId;
-        this.wakePump?.();
-        this.wakePump = null;
-        this.active.prompt(prompt).catch(() => {
+      waitCloseOrTimeout(ms) {
+        if (this.closed) return Promise.resolve();
+        return new Promise((resolve4) => {
+          const t = setTimeout(() => {
+            this.closeWaiters = this.closeWaiters.filter((w) => w !== done);
+            resolve4();
+          }, ms);
+          const done = () => {
+            clearTimeout(t);
+            resolve4();
+          };
+          this.closeWaiters.push(done);
         });
       }
+      // Send this turn's prompt; session/update still flows through pumpUpdates, but ending the turn is tied
+      // to this prompt() promise so a JSON-RPC error on a cancelled prompt cannot leave a leftover counter.
+      // After Stop, wait for pendingCancelSettle before activating Turn N+1 on the wire (Devin cancels an
+      // overlapping session/prompt that arrives while the previous one is still unwinding).
+      async runTurn(turnId, prompt) {
+        const pending = this.pendingCancelSettle;
+        if (pending) {
+          await Promise.race([pending, this.waitCloseOrTimeout(2e3)]);
+          if (this.pendingCancelSettle === pending) this.pendingCancelSettle = null;
+          if (this.closed || !this.running || this.turnId !== turnId) return;
+        }
+        this.mapCtx = newMapCtx();
+        this.activeTurnId = turnId;
+        this.wakePump?.();
+        this.wakePump = null;
+        const req = this.active.prompt(prompt);
+        const settle = req.then(() => {
+        }, () => {
+        });
+        this.inFlightPrompt = settle;
+        try {
+          const res = await req;
+          if (this.activeTurnId === turnId) {
+            this.endTurn(stopToTurnEnd(res.stopReason, turnId));
+          }
+        } catch (e) {
+          if (this.activeTurnId === turnId) {
+            this.endTurn({
+              type: "turn_ended",
+              turnId,
+              status: "failed",
+              error: String(e?.message ?? e)
+            });
+          }
+        } finally {
+          if (this.inFlightPrompt === settle) this.inFlightPrompt = null;
+        }
+      }
       endTurn(ev) {
+        for (const id2 of [...this.permPending.keys()]) this.cancelPerm(id2);
         this.q.push(ev);
         this.activeTurnId = null;
         this.running = false;
@@ -5029,10 +5276,6 @@ var init_session3 = __esm({
             msg = await session.nextUpdate();
           } catch (e) {
             if (this.closed) return;
-            const turnId = this.activeTurnId;
-            if (turnId) {
-              this.endTurn({ type: "turn_ended", turnId, status: "failed", error: String(e?.message ?? e) });
-            }
             await new Promise((r) => this.wakePump = r);
             continue;
           }
@@ -5044,27 +5287,38 @@ var init_session3 = __esm({
             }
             if (!this.activeTurnId) continue;
             for (const ev of mapSessionUpdate(u, this.mapCtx)) this.q.push(ev);
-          } else if (this.activeTurnId) {
-            this.endTurn(stopToTurnEnd(msg.stopReason, this.activeTurnId));
+          } else {
+            continue;
           }
         }
       }
       async interrupt() {
         await this.ready();
         if (!this.ctx || !this.active) return;
-        try {
-          await this.ctx.request(methods2.agent.session.cancel, { sessionId: this.active.sessionId });
-        } catch (e) {
+        const notifyP = this.ctx.notify(methods2.agent.session.cancel, { sessionId: this.active.sessionId }).catch((e) => {
           log("info", `ACP cancel: ${String(e)}`);
+        });
+        const prevSettle = this.inFlightPrompt ?? Promise.resolve();
+        this.pendingCancelSettle = Promise.all([notifyP, prevSettle]).then(
+          () => new Promise((r) => setTimeout(r, 0))
+        );
+        if (this.running) {
+          const turnId = this.activeTurnId ?? this.turnId;
+          if (turnId) {
+            this.endTurn({ type: "turn_ended", turnId, status: "interrupted" });
+          } else {
+            this.running = false;
+          }
         }
+        await notifyP;
       }
-      async setModel(model) {
+      async setModel(model, opts) {
         this.o.model = model;
         await this.ready();
         if (this.o.imagesFollowStartModel) {
           this.promptCaps = model === this.startModel ? this.initCaps : { ...this.initCaps, image: false };
         }
-        await this.applySessionModel(model);
+        return this.applySessionModel(model, Boolean(opts?.force));
       }
       async setMode(mode2) {
         this.o.mode = mode2;
@@ -5089,6 +5343,7 @@ var init_session3 = __esm({
       }
       async close() {
         this.closed = true;
+        for (const w of this.closeWaiters.splice(0)) w();
         this.wakePump?.();
         this.settleCommands();
         for (const r of this.permPending.values()) r({ cancelled: true });
@@ -5138,7 +5393,7 @@ async function resolveProviderBin(cfg2) {
 }
 function createAcpProvider(cfg2) {
   const base = cfg2.capabilities ?? acpCapabilities;
-  const ORDER = ["plan", "default", "acceptEdits", "bypassPermissions"];
+  const ORDER = ["plan", "default", "acceptEdits", "bypassPermissions", "ask"];
   const caps = cfg2.modeMap ? { ...base, modes: ORDER.filter((m) => cfg2.modeMap[m] !== void 0), modeLabels: cfg2.modeLabels } : base;
   return {
     id: cfg2.id,
@@ -5219,7 +5474,9 @@ var init_provider3 = __esm({
     cursorAcpCapabilities = {
       ...acpCapabilities,
       questions: true,
-      modes: ["default", "plan", "ask"]
+      // 1.3: bypassPermissions = 全部自动同意: Cursor's agent mode, every approval answered "allow once" by the daemon
+      // (Cursor's own --force only exists at spawn, and Auto-review is not applied over ACP)
+      modes: ["default", "bypassPermissions", "plan", "ask"]
     };
   }
 });
@@ -5487,8 +5744,9 @@ function acpConfigForEntry(entry, appVersion) {
         ...base,
         acpArgs: ["acp"],
         fetchModels: acpProbeModels(["acp"], entry.id),
-        modeMap: { plan: "plan", default: "build" },
-        modeLabels: { plan: "Plan", default: "Build" }
+        // 1.3: 全部自动同意 = build + the daemon answers each approval "allow once" (OPENCODE_PERMISSION only applies at spawn)
+        modeMap: { plan: "plan", default: "build", bypassPermissions: "build" },
+        modeLabels: { plan: "Plan", default: "Build", bypassPermissions: "Build" }
       };
     case "copilot":
       return {
@@ -5522,6 +5780,272 @@ var init_specs = __esm({
   }
 });
 
+// daemon/src/providers/magpieGateway.ts
+import { readFile as readFile11, stat as stat8 } from "node:fs/promises";
+import { homedir as homedir8 } from "node:os";
+import { join as join11 } from "node:path";
+function magpieTokenFor(agentId) {
+  return `${MAGPIE_GATEWAY_TOKEN}-${agentId}`;
+}
+async function readJson(path4) {
+  try {
+    return JSON.parse(await readFile11(path4, "utf8"));
+  } catch {
+    return null;
+  }
+}
+async function readApplied() {
+  return await readJson(join11(homedir8(), ".config", "magpie", "applied.json")) ?? {};
+}
+async function readClaudeEnv() {
+  const s = await readJson(join11(homedir8(), ".claude", "settings.json"));
+  return s?.env ?? {};
+}
+async function gatewayBase() {
+  const env = await readClaudeEnv();
+  const raw = env.ANTHROPIC_BASE_URL?.trim();
+  return (raw && /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/i.test(raw) ? raw : "http://127.0.0.1:3425").replace(/\/+$/, "");
+}
+async function fetchGatewayModelIds(agentId) {
+  const base = await gatewayBase();
+  const token = magpieTokenFor(agentId);
+  try {
+    const res = await fetch(`${base}/v1/models`, {
+      signal: AbortSignal.timeout(5e3),
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "x-api-key": token,
+        // Belt-and-suspenders: AgentOf also maps known User-Agents when the token is plain "magpie".
+        "User-Agent": `agent-console/${agentId}`
+      }
+    });
+    if (!res.ok) return [];
+    const j = await res.json();
+    return (j.data ?? []).map((m) => m.id).filter((id2) => typeof id2 === "string" && !!id2);
+  } catch (e) {
+    log("warn", "\u8BFB\u53D6 magpie \u7F51\u5173\u6A21\u578B\u5217\u8868\u5931\u8D25", { agent: agentId, err: String(e) });
+    return [];
+  }
+}
+function parseCapabilities(raw) {
+  const out = /* @__PURE__ */ new Map();
+  for (const part of (raw ?? "").split(";")) {
+    const i = part.indexOf("=");
+    if (i <= 0) continue;
+    const flags = new Set(part.slice(i + 1).split(",").map((s) => s.trim()));
+    if (!flags.has("effort")) continue;
+    const levels = ["low", "medium", "high"];
+    if (flags.has("xhigh_effort")) levels.push("xhigh");
+    if (flags.has("max_effort")) levels.push("max");
+    out.set(part.slice(0, i).trim(), levels);
+  }
+  return out;
+}
+function isPlaceholder(m) {
+  return !m.id || /^(default|auto)$/i.test(m.id);
+}
+async function magpieDefaultModel(providerId) {
+  if (providerId === "dsh") return null;
+  const tool = MAGPIE_TOOLS[providerId];
+  if (!tool) return null;
+  const applied = (await readApplied())[tool.key]?.fields?.model?.trim();
+  return applied || null;
+}
+async function magpieConfigFingerprint(providerId) {
+  if (!MAGPIE_TOOLS[providerId]) return "";
+  const home = homedir8();
+  const ownFiles = {
+    claude: [join11(home, ".claude", "settings.json")],
+    codex: [join11(home, ".codex", "config.toml"), join11(home, ".codex", "magpie-models.json"), join11(home, ".codex", "models.json")],
+    opencode: [join11(home, ".config", "opencode", "opencode.json")],
+    pi: [join11(home, ".pi", "agent", "settings.json"), join11(home, ".pi", "agent", "models.json")],
+    // DSH uses YAML under DSH_HOME (default ~/.dsh), not ~/.config/dsh/config.json.
+    dsh: ["config.yaml", "settings.yaml", "cordis.patch.yml", "profiles/desktop/cordis.patch.yml", "profiles/web/cordis.patch.yml"].map((file) => join11(process.env.DSH_HOME?.trim() || join11(home, ".dsh"), file))
+  };
+  const paths = [
+    join11(home, ".config", "magpie", "applied.json"),
+    join11(home, ".config", "magpie", "settings.json"),
+    ...ownFiles[providerId]
+  ];
+  const parts = [];
+  for (const p of paths) {
+    try {
+      const st = await stat8(p);
+      parts.push(`${p}=${st.mtimeMs}`);
+    } catch {
+      parts.push(`${p}=-`);
+    }
+  }
+  return parts.join("|");
+}
+function filterToGatewayShown(list, gatewayIds, prefix, opts) {
+  if (!gatewayIds.length) return list;
+  const shown = new Set(gatewayIds);
+  const shownPrefixed = new Set(gatewayIds.map((id2) => prefix + id2));
+  const codexBare = opts?.providerId === "codex";
+  return list.filter((m) => {
+    if (shown.has(m.id) || shownPrefixed.has(m.id)) return true;
+    if (prefix && m.id.startsWith(prefix) && shown.has(m.id.slice(prefix.length))) return true;
+    if (codexBare && !m.id.includes("/") && shown.has(`codex/${m.id}`)) return true;
+    return false;
+  });
+}
+async function withMagpie(providerId, own) {
+  const tool = MAGPIE_TOOLS[providerId];
+  if (!tool) return own;
+  const applied = (await readApplied())[tool.key]?.fields;
+  if (!applied?.model) return own;
+  const caps = parseCapabilities((await readClaudeEnv()).CLAUDE_CODE_MODEL_CAPABILITIES);
+  const real = own.filter((m) => !isPlaceholder(m));
+  if (providerId === "dsh") {
+    const appliedId = applied.model.replace(/^magpie\//, "");
+    const selected = real.find(
+      (m) => m.id === applied.model || m.id === appliedId || appliedId.includes("/") && m.id.includes(appliedId)
+    );
+    const fallback = selected ?? real.find((m) => m.isDefault) ?? real[0];
+    return real.map((m) => ({ ...m, isDefault: m.id === fallback?.id }));
+  }
+  const knowsMagpie = tool.prefix ? real.some((m) => m.id.startsWith(tool.prefix)) : real.length > 0;
+  const gatewayIds = await fetchGatewayModelIds(tool.key);
+  let list;
+  if (knowsMagpie) {
+    const mine = real.filter((m) => !tool.prefix || m.id.startsWith(tool.prefix));
+    const others = tool.prefix ? real.filter((m) => !m.id.startsWith(tool.prefix)) : [];
+    const filteredMine = gatewayIds.length ? filterToGatewayShown(mine, gatewayIds, tool.prefix, { providerId }) : mine;
+    list = [...filteredMine.length ? filteredMine : mine, ...others];
+  } else {
+    list = gatewayIds.map((gid) => ({ id: tool.prefix + gid, name: gid }));
+  }
+  const defId = applied.model;
+  if (!list.some((m) => m.id === defId)) list.unshift({ id: defId, name: defId.slice(tool.prefix.length) || defId });
+  list = list.map((m) => ({ ...m, isDefault: m.id === defId }));
+  list.sort((a, b) => Number(!!b.isDefault) - Number(!!a.isDefault));
+  return list.map((m) => {
+    const name = tool.prefix && m.name.startsWith(tool.prefix) ? m.name.slice(tool.prefix.length) : m.name;
+    if (m.thinkingOptions?.length && providerId !== "claude") return { ...m, name };
+    const levels = caps.get(m.id.slice(tool.prefix.length) || m.id);
+    if (!levels) return { ...m, name, thinkingOptions: providerId === "claude" ? [] : m.thinkingOptions };
+    const def = applied.effort && levels.includes(applied.effort) ? applied.effort : levels.includes("high") ? "high" : levels[0];
+    return {
+      ...m,
+      name,
+      thinkingOptions: levels.map((id2) => ({ id: id2, label: EFFORT_LABEL2[id2] ?? id2 })),
+      defaultThinking: m.isDefault ? def : m.defaultThinking ?? def
+    };
+  });
+}
+var MAGPIE_TOOLS, MAGPIE_GATEWAY_TOKEN, EFFORT_LABEL2;
+var init_magpieGateway = __esm({
+  "daemon/src/providers/magpieGateway.ts"() {
+    init_log();
+    MAGPIE_TOOLS = {
+      claude: { key: "claude", prefix: "" },
+      codex: { key: "codex", prefix: "" },
+      opencode: { key: "opencode", prefix: "magpie/" },
+      pi: { key: "pi", prefix: "magpie/" },
+      dsh: { key: "dsh", prefix: "magpie/" }
+    };
+    MAGPIE_GATEWAY_TOKEN = "magpie";
+    EFFORT_LABEL2 = {
+      low: "Low",
+      medium: "Medium",
+      high: "High",
+      xhigh: "Extra High",
+      max: "Max"
+    };
+  }
+});
+
+// daemon/src/providers/infoCache.ts
+function registerProviderCacheClear(hook) {
+  extraClearHooks.add(hook);
+}
+function withTimeout2(p, ms, fb) {
+  return Promise.race([p, new Promise((r) => setTimeout(() => r(fb), ms))]);
+}
+function fresh(e, ttl, fp) {
+  if (!e || Date.now() - e.at >= ttl) return false;
+  if (fp !== void 0 && e.fp !== void 0 && e.fp !== fp) return false;
+  return true;
+}
+function cacheKey(p, launch) {
+  return launch ? `${p.id}\0${launchKey(launch)}` : p.id;
+}
+async function cachedDetect(p, launch) {
+  const key = cacheKey(p, launch);
+  const hit = detects.get(key);
+  if (fresh(hit, DETECT_MS)) return hit.value;
+  let job = inflightDetect.get(key);
+  if (!job) {
+    const timedOut = { available: false, reason: tr("provider.timeout") };
+    job = withTimeout2(
+      p.detect(launch).catch((e) => ({ available: false, reason: String(e?.message ?? e) })),
+      STEP_TIMEOUT_MS,
+      timedOut
+    ).then((v) => {
+      if (v !== timedOut) detects.set(key, { at: Date.now(), value: v });
+      return v;
+    }).finally(() => inflightDetect.delete(key));
+    inflightDetect.set(key, job);
+  }
+  return job;
+}
+async function cachedModels(p, launch) {
+  const key = cacheKey(p, launch);
+  const fp = await magpieConfigFingerprint(p.id).catch(() => "");
+  const hit = models.get(key);
+  if (fresh(hit, MODELS_MS, fp)) return hit.value;
+  let job = inflightModels.get(key);
+  if (!job) {
+    job = withTimeout2(p.listModels(launch).catch(() => []), MODELS_TIMEOUT_MS, null).then(async (v) => {
+      if (v === null) return models.get(key)?.value ?? [];
+      const list = await withMagpie(p.id, dropPlaceholder(v)).catch(() => dropPlaceholder(v));
+      models.set(key, { at: Date.now(), value: list, fp });
+      return list;
+    }).finally(() => inflightModels.delete(key));
+    inflightModels.set(key, job);
+  }
+  return job;
+}
+function dropPlaceholder(list) {
+  if (list.length === 1 && list[0].id === "default" && (list[0].name === "\u9ED8\u8BA4" || list[0].name === PLACEHOLDER_MODEL_NAME)) return [];
+  return list;
+}
+function clearProviderCache(id2) {
+  if (id2) {
+    for (const m of [detects, models]) {
+      for (const k of [...m.keys()]) if (k === id2 || k.startsWith(id2 + "\0")) m.delete(k);
+    }
+  } else {
+    detects.clear();
+    models.clear();
+  }
+  for (const hook of extraClearHooks) {
+    try {
+      hook(id2);
+    } catch {
+    }
+  }
+}
+var DETECT_MS, MODELS_MS, STEP_TIMEOUT_MS, MODELS_TIMEOUT_MS, detects, models, inflightDetect, inflightModels, extraClearHooks;
+var init_infoCache = __esm({
+  "daemon/src/providers/infoCache.ts"() {
+    init_types();
+    init_magpieGateway();
+    init_launch();
+    init_i18n();
+    DETECT_MS = 60 * 1e3;
+    MODELS_MS = 10 * 60 * 1e3;
+    STEP_TIMEOUT_MS = 15e3;
+    MODELS_TIMEOUT_MS = 35e3;
+    detects = /* @__PURE__ */ new Map();
+    models = /* @__PURE__ */ new Map();
+    inflightDetect = /* @__PURE__ */ new Map();
+    inflightModels = /* @__PURE__ */ new Map();
+    extraClearHooks = /* @__PURE__ */ new Set();
+  }
+});
+
 // daemon/src/providers/registry.ts
 function registerProvider(p) {
   providers.set(p.id, p);
@@ -5533,6 +6057,12 @@ function listProviders() {
   return [...providers.values()];
 }
 function initProviders(version = "") {
+  if (!codexCacheHooked) {
+    registerProviderCacheClear((id2) => {
+      if (!id2 || id2 === "codex") clearCodexModelCache();
+    });
+    codexCacheHooked = true;
+  }
   providers.clear();
   for (const entry of PROVIDER_CATALOG) {
     if (entry.id === "claude") registerProvider(createClaudeProvider());
@@ -5546,7 +6076,7 @@ function initProviders(version = "") {
     registerProvider(createMockProvider());
   }
 }
-var providers;
+var codexCacheHooked, providers;
 var init_registry = __esm({
   "daemon/src/providers/registry.ts"() {
     init_mock();
@@ -5555,6 +6085,8 @@ var init_registry = __esm({
     init_catalog();
     init_provider3();
     init_specs();
+    init_infoCache();
+    codexCacheHooked = false;
     providers = /* @__PURE__ */ new Map();
   }
 });
@@ -5663,198 +6195,6 @@ var init_pickFolder = __esm({
   }
 });
 
-// daemon/src/providers/magpieGateway.ts
-import { readFile as readFile11 } from "node:fs/promises";
-import { homedir as homedir8 } from "node:os";
-import { join as join11 } from "node:path";
-async function readJson(path4) {
-  try {
-    return JSON.parse(await readFile11(path4, "utf8"));
-  } catch {
-    return null;
-  }
-}
-async function readApplied() {
-  return await readJson(join11(homedir8(), ".config", "magpie", "applied.json")) ?? {};
-}
-async function readClaudeEnv() {
-  const s = await readJson(join11(homedir8(), ".claude", "settings.json"));
-  return s?.env ?? {};
-}
-async function gatewayBase() {
-  const env = await readClaudeEnv();
-  const raw = env.ANTHROPIC_BASE_URL?.trim();
-  return (raw && /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/i.test(raw) ? raw : "http://127.0.0.1:3425").replace(/\/+$/, "");
-}
-async function fetchGatewayModelIds() {
-  const base = await gatewayBase();
-  try {
-    const res = await fetch(`${base}/v1/models`, { signal: AbortSignal.timeout(5e3) });
-    if (!res.ok) return [];
-    const j = await res.json();
-    return (j.data ?? []).map((m) => m.id).filter((id2) => typeof id2 === "string" && !!id2);
-  } catch (e) {
-    log("warn", "\u8BFB\u53D6 magpie \u7F51\u5173\u6A21\u578B\u5217\u8868\u5931\u8D25", { err: String(e) });
-    return [];
-  }
-}
-function parseCapabilities(raw) {
-  const out = /* @__PURE__ */ new Map();
-  for (const part of (raw ?? "").split(";")) {
-    const i = part.indexOf("=");
-    if (i <= 0) continue;
-    const flags = new Set(part.slice(i + 1).split(",").map((s) => s.trim()));
-    if (!flags.has("effort")) continue;
-    const levels = ["low", "medium", "high"];
-    if (flags.has("xhigh_effort")) levels.push("xhigh");
-    if (flags.has("max_effort")) levels.push("max");
-    out.set(part.slice(0, i).trim(), levels);
-  }
-  return out;
-}
-function isPlaceholder(m) {
-  return !m.id || /^(default|auto)$/i.test(m.id);
-}
-async function withMagpie(providerId, own) {
-  const tool = MAGPIE_TOOLS[providerId];
-  if (!tool) return own;
-  const applied = (await readApplied())[tool.key]?.fields;
-  if (!applied?.model) return own;
-  const caps = parseCapabilities((await readClaudeEnv()).CLAUDE_CODE_MODEL_CAPABILITIES);
-  const real = own.filter((m) => !isPlaceholder(m));
-  if (providerId === "dsh") {
-    const appliedId = applied.model.replace(/^magpie\//, "");
-    const selected = real.find(
-      (m) => m.id === applied.model || m.id === appliedId || appliedId.includes("/") && m.id.includes(appliedId)
-    );
-    const fallback = selected ?? real.find((m) => m.isDefault) ?? real[0];
-    return real.map((m) => ({ ...m, isDefault: m.id === fallback?.id }));
-  }
-  const knowsMagpie = tool.prefix ? real.some((m) => m.id.startsWith(tool.prefix)) : real.length > 0;
-  let list;
-  if (knowsMagpie) {
-    const mine = real.filter((m) => !tool.prefix || m.id.startsWith(tool.prefix));
-    const others = tool.prefix ? real.filter((m) => !m.id.startsWith(tool.prefix)) : [];
-    list = [...mine, ...others];
-  } else {
-    list = (await fetchGatewayModelIds()).map((gid) => ({ id: tool.prefix + gid, name: gid }));
-  }
-  const defId = applied.model;
-  if (!list.some((m) => m.id === defId)) list.unshift({ id: defId, name: defId.slice(tool.prefix.length) || defId });
-  list = list.map((m) => ({ ...m, isDefault: m.id === defId }));
-  list.sort((a, b) => Number(!!b.isDefault) - Number(!!a.isDefault));
-  return list.map((m) => {
-    const name = tool.prefix && m.name.startsWith(tool.prefix) ? m.name.slice(tool.prefix.length) : m.name;
-    if (m.thinkingOptions?.length && providerId !== "claude") return { ...m, name };
-    const levels = caps.get(m.id.slice(tool.prefix.length) || m.id);
-    if (!levels) return { ...m, name, thinkingOptions: providerId === "claude" ? [] : m.thinkingOptions };
-    const def = applied.effort && levels.includes(applied.effort) ? applied.effort : levels.includes("high") ? "high" : levels[0];
-    return {
-      ...m,
-      name,
-      thinkingOptions: levels.map((id2) => ({ id: id2, label: EFFORT_LABEL2[id2] ?? id2 })),
-      defaultThinking: m.isDefault ? def : m.defaultThinking ?? def
-    };
-  });
-}
-var MAGPIE_TOOLS, EFFORT_LABEL2;
-var init_magpieGateway = __esm({
-  "daemon/src/providers/magpieGateway.ts"() {
-    init_log();
-    MAGPIE_TOOLS = {
-      claude: { key: "claude", prefix: "" },
-      codex: { key: "codex", prefix: "" },
-      opencode: { key: "opencode", prefix: "magpie/" },
-      pi: { key: "pi", prefix: "magpie/" },
-      dsh: { key: "dsh", prefix: "magpie/" }
-    };
-    EFFORT_LABEL2 = {
-      low: "Low",
-      medium: "Medium",
-      high: "High",
-      xhigh: "Extra High",
-      max: "Max"
-    };
-  }
-});
-
-// daemon/src/providers/infoCache.ts
-function withTimeout2(p, ms, fb) {
-  return Promise.race([p, new Promise((r) => setTimeout(() => r(fb), ms))]);
-}
-function fresh(e, ttl) {
-  return !!e && Date.now() - e.at < ttl;
-}
-function cacheKey(p, launch) {
-  return launch ? `${p.id}\0${launchKey(launch)}` : p.id;
-}
-async function cachedDetect(p, launch) {
-  const key = cacheKey(p, launch);
-  const hit = detects.get(key);
-  if (fresh(hit, DETECT_MS)) return hit.value;
-  let job = inflightDetect.get(key);
-  if (!job) {
-    const timedOut = { available: false, reason: tr("provider.timeout") };
-    job = withTimeout2(
-      p.detect(launch).catch((e) => ({ available: false, reason: String(e?.message ?? e) })),
-      STEP_TIMEOUT_MS,
-      timedOut
-    ).then((v) => {
-      if (v !== timedOut) detects.set(key, { at: Date.now(), value: v });
-      return v;
-    }).finally(() => inflightDetect.delete(key));
-    inflightDetect.set(key, job);
-  }
-  return job;
-}
-async function cachedModels(p, launch) {
-  const key = cacheKey(p, launch);
-  const hit = models.get(key);
-  if (fresh(hit, MODELS_MS)) return hit.value;
-  let job = inflightModels.get(key);
-  if (!job) {
-    job = withTimeout2(p.listModels(launch).catch(() => []), MODELS_TIMEOUT_MS, null).then(async (v) => {
-      if (v === null) return models.get(key)?.value ?? [];
-      const list = await withMagpie(p.id, dropPlaceholder(v)).catch(() => dropPlaceholder(v));
-      models.set(key, { at: Date.now(), value: list });
-      return list;
-    }).finally(() => inflightModels.delete(key));
-    inflightModels.set(key, job);
-  }
-  return job;
-}
-function dropPlaceholder(list) {
-  if (list.length === 1 && list[0].id === "default" && (list[0].name === "\u9ED8\u8BA4" || list[0].name === PLACEHOLDER_MODEL_NAME)) return [];
-  return list;
-}
-function clearProviderCache(id2) {
-  if (id2) {
-    for (const m of [detects, models]) {
-      for (const k of [...m.keys()]) if (k === id2 || k.startsWith(id2 + "\0")) m.delete(k);
-    }
-  } else {
-    detects.clear();
-    models.clear();
-  }
-}
-var DETECT_MS, MODELS_MS, STEP_TIMEOUT_MS, MODELS_TIMEOUT_MS, detects, models, inflightDetect, inflightModels;
-var init_infoCache = __esm({
-  "daemon/src/providers/infoCache.ts"() {
-    init_types();
-    init_magpieGateway();
-    init_launch();
-    init_i18n();
-    DETECT_MS = 60 * 1e3;
-    MODELS_MS = 10 * 60 * 1e3;
-    STEP_TIMEOUT_MS = 15e3;
-    MODELS_TIMEOUT_MS = 35e3;
-    detects = /* @__PURE__ */ new Map();
-    models = /* @__PURE__ */ new Map();
-    inflightDetect = /* @__PURE__ */ new Map();
-    inflightModels = /* @__PURE__ */ new Map();
-  }
-});
-
 // daemon/src/providers/modes.ts
 function clampMode(modes, mode2) {
   if (mode2 && modes.includes(mode2)) return mode2;
@@ -5866,9 +6206,109 @@ var init_modes = __esm({
   }
 });
 
+// daemon/src/providers/autoApprove.ts
+function pickAllowOnce(options) {
+  const once = options.find((o) => o.kind === "allow_once");
+  if (once) return once;
+  const plain = options.find((o) => {
+    const s = `${o.id} ${o.label ?? ""}`;
+    return !o.kind?.startsWith("reject") && !REJECT.test(s) && ALLOW.test(s) && !/always|session|总是|始终/i.test(s);
+  });
+  return plain ?? null;
+}
+function autoApproveOption(mode2, providerId, req) {
+  if (mode2 !== FULL_AUTO) return null;
+  if (FULL_AUTO_NATIVE[providerId]?.daemonAnswers === false) return null;
+  if (req.kind === "plan" || req.kind === "switch_mode") return null;
+  return pickAllowOnce(req.options);
+}
+var FULL_AUTO, FULL_AUTO_NATIVE, REJECT, ALLOW;
+var init_autoApprove = __esm({
+  "daemon/src/providers/autoApprove.ts"() {
+    FULL_AUTO = "bypassPermissions";
+    FULL_AUTO_NATIVE = {
+      claude: { native: "--permission-mode bypassPermissions (+ --allow-dangerously-skip-permissions)", live: "nextTurn", daemonAnswers: true },
+      codex: { native: "approvalPolicy never + sandbox danger-full-access (turn/start)", live: "nextTurn", daemonAnswers: true },
+      cursor: { native: "none over ACP (--force is spawn-only); ACP mode agent", live: "live", daemonAnswers: true },
+      copilot: { native: "ACP config allow_all = on (agent mode)", live: "live", daemonAnswers: true },
+      opencode: { native: "none over ACP (OPENCODE_PERMISSION is spawn-only); ACP mode build", live: "live", daemonAnswers: true },
+      devin: { native: "ACP mode bypass", live: "live", daemonAnswers: true },
+      dsh: { native: "none known; ACP default mode", live: "live", daemonAnswers: true },
+      // pi never asks before its own tools; requestPermission only carries Pi extensions' own dialogs, which stay with the user
+      pi: { native: "always (Pi has no tool approvals)", live: "live", daemonAnswers: false },
+      mock: { native: "mock", live: "live", daemonAnswers: true }
+    };
+    REJECT = /reject|deny|decline|cancel|never|拒绝/i;
+    ALLOW = /allow|accept|approve|yes|允许|同意/i;
+  }
+});
+
+// daemon/src/migrate/autoApprove13.ts
+var autoApprove13_exports = {};
+__export(autoApprove13_exports, {
+  LEGACY_NO_AUTO: () => LEGACY_NO_AUTO,
+  MIGRATED_NOTICE_CODE: () => MIGRATED_NOTICE_CODE,
+  UPGRADE_NOTICE_CODE: () => UPGRADE_NOTICE_CODE,
+  endLegacyDefault: () => endLegacyDefault,
+  guardLegacyMode: () => guardLegacyMode,
+  migrateAutoApprove13: () => migrateAutoApprove13,
+  upgradeNotice: () => upgradeNotice
+});
+function state(s) {
+  const v = s[KEY];
+  return v && typeof v === "object" && v.done === true ? { done: true, legacyDefault: v.legacyDefault === true, noticed: v.noticed === true } : null;
+}
+async function migrateAutoApprove13(stores) {
+  const s = await stores.settings.get();
+  if (state(s)) return { threads: [], legacyDefault: false, skipped: true };
+  const moved = [];
+  for (const t of await stores.threads.list()) {
+    if (t.mode !== FULL_AUTO || !LEGACY_NO_AUTO.has(t.provider)) continue;
+    try {
+      await stores.threads.patch(t.id, { mode: "default" });
+      await stores.threads.appendEvent(t.id, { type: "notice", level: "warn", code: MIGRATED_NOTICE_CODE, message: tr("notice.autoApproveMigrated") });
+      moved.push(t.id);
+    } catch (e) {
+      log("warn", `\u5168\u90E8\u81EA\u52A8\u540C\u610F\u8FC1\u79FB\uFF1A\u5BF9\u8BDD ${t.id} \u5931\u8D25\uFF1A${String(e)}`);
+    }
+  }
+  const legacyDefault = s.defaultMode === FULL_AUTO;
+  await stores.settings.set({ [KEY]: { done: true, legacyDefault, noticed: false } });
+  if (moved.length || legacyDefault) log("info", `\u5168\u90E8\u81EA\u52A8\u540C\u610F\u8FC1\u79FB\uFF1A${moved.length} \u4E2A\u5BF9\u8BDD\u6539\u56DE\u6BCF\u6B21\u8BE2\u95EE\uFF1B\u65E7\u7684\u9ED8\u8BA4\u5168\u90E8\u653E\u884C=${legacyDefault}`);
+  return { threads: moved, legacyDefault, skipped: false };
+}
+async function guardLegacyMode(settings, providerId, mode2) {
+  if (mode2 !== FULL_AUTO || !LEGACY_NO_AUTO.has(providerId)) return { mode: mode2, notice: false };
+  const s = await settings.get();
+  const st = state(s);
+  if (!st?.legacyDefault) return { mode: mode2, notice: false };
+  if (st.noticed) return { mode: "default", notice: false };
+  await settings.set({ [KEY]: { ...st, noticed: true } });
+  return { mode: "default", notice: true };
+}
+async function endLegacyDefault(settings) {
+  const st = state(await settings.get());
+  if (st?.legacyDefault) await settings.set({ [KEY]: { ...st, legacyDefault: false } });
+}
+function upgradeNotice() {
+  return { type: "notice", level: "info", code: UPGRADE_NOTICE_CODE, message: tr("notice.autoApproveUpgrade") };
+}
+var LEGACY_NO_AUTO, UPGRADE_NOTICE_CODE, MIGRATED_NOTICE_CODE, KEY;
+var init_autoApprove13 = __esm({
+  "daemon/src/migrate/autoApprove13.ts"() {
+    init_autoApprove();
+    init_i18n();
+    init_log();
+    LEGACY_NO_AUTO = /* @__PURE__ */ new Set(["cursor", "opencode", "dsh"]);
+    UPGRADE_NOTICE_CODE = "auto_approve_upgrade";
+    MIGRATED_NOTICE_CODE = "auto_approve_migrated";
+    KEY = "autoApproveUpgrade";
+  }
+});
+
 // daemon/src/util/mentions.ts
-import { realpath, stat as stat8 } from "node:fs/promises";
-import { isAbsolute as isAbsolute2, resolve as resolve3, sep as sep2, win32 as win322, posix as posix2 } from "node:path";
+import { realpath, stat as stat9 } from "node:fs/promises";
+import { isAbsolute as isAbsolute3, resolve as resolve3, sep as sep2, win32 as win322, posix as posix2 } from "node:path";
 function insideRoot(root, child, platform = process.platform) {
   const p = platform === "win32" ? win322 : posix2;
   const norm2 = (s) => platform === "win32" ? p.resolve(s).toLowerCase() : p.resolve(s);
@@ -5888,7 +6328,7 @@ async function resolveMentions(projectPath, refs) {
   }
   for (const ref of refs.slice(0, MAX_MENTIONS)) {
     const rel = String(ref.rel ?? "").replace(/\\/g, "/");
-    if (!rel || rel.includes("\0") || isAbsolute2(rel) || /^[a-zA-Z]:/.test(rel)) {
+    if (!rel || rel.includes("\0") || isAbsolute3(rel) || /^[a-zA-Z]:/.test(rel)) {
       warnings.push(rel || "(empty)");
       continue;
     }
@@ -5901,7 +6341,7 @@ async function resolveMentions(projectPath, refs) {
     let isDir2;
     try {
       real = await realpath(abs);
-      isDir2 = (await stat8(real)).isDirectory();
+      isDir2 = (await stat9(real)).isDirectory();
     } catch {
       warnings.push(rel);
       continue;
@@ -6727,7 +7167,7 @@ import { z } from "zod";
 import { existsSync as existsSync9, statSync as statSync5 } from "node:fs";
 import { mkdir as mkdir3, writeFile as writeFile4 } from "node:fs/promises";
 import { homedir as homedir9 } from "node:os";
-import { dirname as dirname3, join as join12, win32 as win32Path } from "node:path";
+import { dirname as dirname4, join as join12, win32 as win32Path } from "node:path";
 import { execFile as execFile4 } from "node:child_process";
 function wrap(schema, fn) {
   return (params, ctx) => {
@@ -6795,6 +7235,7 @@ function registerMethods(gw, svc) {
     if (!checked.ok) throw new ApiError("bad_params", `Invalid setting: ${checked.error}`);
     const before = await svc.settings.get();
     const next = await svc.settings.set(checked.patch);
+    if ("defaultMode" in checked.patch) await endLegacyDefault(svc.settings);
     if ("bashPath" in checked.patch && (before.bashPath ?? "") !== (next.bashPath ?? "")) {
       await refreshAgentShell(typeof next.bashPath === "string" ? next.bashPath : "");
     }
@@ -6822,11 +7263,16 @@ function registerMethods(gw, svc) {
     return { ok: true };
   }));
   gw.method("providers.list", wrap(
-    z.object({ refresh: z.boolean().optional() }).passthrough().optional(),
+    z.object({ refresh: z.boolean().optional(), provider: z.string().optional() }).passthrough().optional(),
     async (p) => {
       if (p?.refresh) {
-        clearBinCache();
-        clearProviderCache();
+        if (p.provider) {
+          clearBinCache(p.provider);
+          clearProviderCache(p.provider);
+        } else {
+          clearBinCache();
+          clearProviderCache();
+        }
       }
       const settings = await svc.settings.get();
       const rows = await Promise.all(
@@ -6944,8 +7390,10 @@ function registerMethods(gw, svc) {
         throw new ApiError("bad_params", tr("provider.plannedNamed", { name: cat.name }));
       }
       const provider = getProvider(p.provider);
-      const mode2 = clampMode(provider?.capabilities.modes ?? [], p.mode);
+      const guard = await guardLegacyMode(svc.settings, p.provider, clampMode(provider?.capabilities.modes ?? [], p.mode));
+      const mode2 = guard.mode;
       const meta = await svc.threads.create({ ...p, mode: mode2 });
+      if (guard.notice) await svc.threads.appendEvent(meta.id, upgradeNotice());
       gw.publish("sidebar", { type: "thread.upsert", thread: meta });
       return meta;
     }
@@ -7270,7 +7718,7 @@ function revealInFileManager(filePath) {
     });
     return;
   }
-  execFile4("xdg-open", [dirname3(filePath)], () => {
+  execFile4("xdg-open", [dirname4(filePath)], () => {
   }).on("error", () => {
   });
 }
@@ -7286,6 +7734,7 @@ var init_methods = __esm({
     init_infoCache();
     init_launch();
     init_modes();
+    init_autoApprove13();
     init_i18n();
     init_mentions();
     init_openExternal();
@@ -7307,10 +7756,10 @@ var init_methods = __esm({
 
 // daemon/src/util/atomic.ts
 import { writeFile as writeFile5, rename, mkdir as mkdir4 } from "node:fs/promises";
-import { dirname as dirname4 } from "node:path";
+import { dirname as dirname5 } from "node:path";
 async function writeJsonAtomic(file, obj) {
   try {
-    await mkdir4(dirname4(file), { recursive: true });
+    await mkdir4(dirname5(file), { recursive: true });
     const tmp = `${file}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
     await writeFile5(tmp, JSON.stringify(obj, null, 2), "utf8");
     await rename(tmp, file);
@@ -7442,7 +7891,7 @@ var init_settings = __esm({
 
 // daemon/src/util/jsonl.ts
 import { appendFile, readFile as readFile14, mkdir as mkdir5, rename as rename2, writeFile as writeFile6 } from "node:fs/promises";
-import { dirname as dirname5 } from "node:path";
+import { dirname as dirname6 } from "node:path";
 async function readJsonl(file) {
   let text = "";
   try {
@@ -7465,7 +7914,7 @@ function appendJsonl(file, obj) {
   const prev = writers.get(file) ?? Promise.resolve();
   const next = prev.then(async () => {
     try {
-      await mkdir5(dirname5(file), { recursive: true });
+      await mkdir5(dirname6(file), { recursive: true });
       await appendFile(file, JSON.stringify(obj) + "\n", "utf8");
     } catch (e) {
       if (e instanceof ApiError) throw e;
@@ -7754,7 +8203,7 @@ var init_warm = __esm({
 
 // daemon/src/main.ts
 import { mkdirSync as mkdirSync2, rmSync as rmSync2, chmodSync as chmodSync2 } from "node:fs";
-import { join as join21, dirname as dirname8 } from "node:path";
+import { join as join21, dirname as dirname9 } from "node:path";
 import { fileURLToPath as fileURLToPath4 } from "node:url";
 
 // daemon/src/config.ts
@@ -8561,11 +9010,14 @@ init_registry();
 // daemon/src/agents/manager.ts
 init_launch();
 init_modes();
+init_autoApprove13();
+init_autoApprove();
 init_attachmentRefs();
 init_registry();
 init_catalog();
 init_enabled();
 init_infoCache();
+init_magpieGateway();
 
 // daemon/src/timeline/coalescer.ts
 var Coalescer = class {
@@ -8861,6 +9313,7 @@ var AgentManager = class {
         throw e;
       }
     }
+    await this.syncDefaultModelIfNeeded(threadId, meta, rt);
     await agentShellReady();
     if (!rt.bashHinted && bashMissingFor(meta.provider)) {
       rt.bashHinted = true;
@@ -8869,7 +9322,8 @@ var AgentManager = class {
     await this.setStatus(threadId, "running");
     try {
       const images = await this.resolveAttachments(attachmentRefs);
-      await rt.session.send({ text: withMentions(text, mentions), images, mentions });
+      const payload = { text: withMentions(text, mentions), images, mentions };
+      await rt.session.send(payload);
     } catch (e) {
       const msg = String(e?.message ?? e);
       await this.appendRaw(threadId, { type: "notice", level: "error", message: tr("notice.sendFailed", { detail: msg }) });
@@ -8967,9 +9421,21 @@ var AgentManager = class {
         },
         event: ev
       };
+      if (ev.type === "permission_request") {
+        const meta = await this.threads.get(threadId);
+        const auto = meta ? autoApproveOption(meta.mode, meta.provider, ev) : null;
+        if (auto) {
+          log("info", `thread ${threadId} \u81EA\u52A8\u540C\u610F ${ev.title.slice(0, 80)} \u2192 ${auto.id}`);
+          await this.appendRaw(threadId, { ...ev, auto: true });
+          await this.appendRaw(threadId, { type: "permission_resolved", requestId: ev.requestId, optionId: auto.id, auto: true });
+          rt.session?.respond(ev.requestId, { optionId: auto.id });
+          return;
+        }
+      }
       const toolName = ev.detail?.toolName;
       if (toolName && rt.allowAlways.has(toolName)) {
-        rt.session?.respond(ev.requestId, { optionId: "accept" });
+        const allow = options.find((o) => o.kind === "allow_once") ?? options.find((o) => o.kind === "allow_always");
+        rt.session?.respond(ev.requestId, { optionId: allow?.id ?? "accept" });
         return;
       }
       rt.pending.set(ev.requestId, pending);
@@ -8988,6 +9454,7 @@ var AgentManager = class {
         rt.interruptTimer = null;
       }
       if (ev.turnId && ev.turnId !== "unknown") rt.endedTurnIds.add(ev.turnId);
+      await this.cancelPending(threadId, rt, { tellSession: true });
       rt.coalescer.dispose();
       rt.coalescer = this.newCoalescer(threadId);
       await this.appendRaw(threadId, ev);
@@ -9051,15 +9518,45 @@ var AgentManager = class {
     }
     rt.session?.respond(requestId, answer);
   }
+  /** Answer every waiting tool approval with its allow-once option (full-auto just turned on). Returns how many. */
+  async autoApprovePending(threadId, providerId, mode2) {
+    const rt = this.rt(threadId);
+    let n = 0;
+    for (const p of [...rt.pending.values()]) {
+      if (p.kind !== "permission") continue;
+      const ev = p.event;
+      const opt = autoApproveOption(mode2, providerId, { kind: ev.kind, options: p.options });
+      if (!opt) continue;
+      rt.pending.delete(p.requestId);
+      await this.appendRaw(threadId, { type: "permission_resolved", requestId: p.requestId, optionId: opt.id, auto: true });
+      rt.session?.respond(p.requestId, { optionId: opt.id });
+      n++;
+    }
+    return n;
+  }
+  /** Cancel every open permission/question: persisted as permission_resolved{cancelled} (the page marks the card
+   *  已取消 and stops waiting). tellSession: also answer the provider's own waiter (an Agent that ended its turn without
+   *  withdrawing the request would otherwise keep a dangling promise); its echo is dropped because rt.pending is empty. */
+  async cancelPending(threadId, rt, opts) {
+    if (!rt.pending.size) return;
+    const open = [...rt.pending.values()];
+    rt.pending.clear();
+    for (const p of open) {
+      await this.appendRaw(threadId, { type: "permission_resolved", requestId: p.requestId, cancelled: true });
+      p.resolve({ cancelled: true });
+      if (opts.tellSession) {
+        try {
+          rt.session?.respond(p.requestId, { cancelled: true });
+        } catch {
+        }
+      }
+    }
+  }
   // ---- interrupt ----
   async interrupt(threadId) {
     const rt = this.rt(threadId);
     if (!rt.session || rt.status !== "running") return;
-    for (const [id2, p] of rt.pending) {
-      await this.appendRaw(threadId, { type: "permission_resolved", requestId: id2, cancelled: true });
-      p.resolve({ cancelled: true });
-    }
-    rt.pending.clear();
+    await this.cancelPending(threadId, rt, { tellSession: false });
     await rt.session.interrupt();
     const turnId = rt.currentTurnId;
     rt.interruptTimer = setTimeout(() => {
@@ -9089,14 +9586,54 @@ var AgentManager = class {
         });
       }
     }
+    const sessionModel = model ?? await this.resolveDefaultSessionModel(meta.provider);
     await this.threads.patch(threadId, { model, effort });
     const rt = this.rt(threadId);
-    if (rt.session) await rt.session.setModel(model);
+    let applied = true;
+    if (rt.session) {
+      if (model !== null) applied = await rt.session.setModel(sessionModel, { force: true });
+      else applied = await rt.session.setModel(sessionModel);
+    }
+    rt.syncedDefaultModel = model ? void 0 : applied === false ? void 0 : sessionModel;
     this.gw.publish("sidebar", { type: "thread.upsert", thread: await this.threads.get(threadId) });
   }
+  /**
+   * Default model id to push into a live session while the thread is on「默认」.
+   * dsh must use its own ACP model ids from cachedModels (never raw applied.json "magpie/…" strings).
+   */
+  async resolveDefaultSessionModel(providerId) {
+    if (providerId === "dsh") {
+      const provider = getProvider(providerId);
+      if (!provider) return null;
+      const settings = await this.settings.get();
+      const launch = launchFromSettings(settings, providerId);
+      const available = await cachedModels(provider, launch).catch(() => []);
+      const magpie = available.filter((m) => /magpie/i.test(m.id));
+      return (magpie.find((m) => m.isDefault) ?? magpie[0] ?? available.find((m) => m.isDefault))?.id ?? null;
+    }
+    return magpieDefaultModel(providerId);
+  }
+  /**
+   * Thread on「默认」+ idle live session: if Magpie's applied default changed since we last synced,
+   * push the new id into the session (never interrupts a running turn — caller only invokes while idle/before send).
+   */
+  async syncDefaultModelIfNeeded(threadId, meta, rt) {
+    if (meta.model) return;
+    if (!rt.session) return;
+    if (rt.status === "running" || rt.status === "initializing") return;
+    const current = await this.resolveDefaultSessionModel(meta.provider);
+    if (current === (rt.syncedDefaultModel ?? null)) return;
+    try {
+      const applied = await rt.session.setModel(current);
+      if (applied !== false) rt.syncedDefaultModel = current;
+    } catch (e) {
+      log("warn", `thread ${threadId} sync default model failed\uFF1A${String(e)}`);
+    }
+  }
   async setMode(threadId, mode2) {
-    await this.threads.patch(threadId, { mode: mode2 });
+    const meta = await this.threads.patch(threadId, { mode: mode2 });
     const rt = this.rt(threadId);
+    if (mode2 === FULL_AUTO) await this.autoApprovePending(threadId, meta.provider, mode2);
     if (rt.session) await rt.session.setMode(mode2);
     this.gw.publish("sidebar", { type: "thread.upsert", thread: await this.threads.get(threadId) });
   }
@@ -9149,14 +9686,16 @@ var AgentManager = class {
       rt.commands = [];
     }
     rt.status = "idle";
+    const guard = await guardLegacyMode(this.settings, providerId, clampMode(p.capabilities.modes, meta.mode));
     await this.threads.patch(threadId, {
       provider: providerId,
       model: null,
-      mode: clampMode(p.capabilities.modes, meta.mode),
+      mode: guard.mode,
       effort: null,
       providerSessionId: null,
       status: "idle"
     });
+    if (guard.notice) await this.appendRaw(threadId, upgradeNotice());
     this.gw.publish("sidebar", { type: "thread.upsert", thread: await this.threads.get(threadId) });
   }
   async close(threadId) {
@@ -9265,10 +9804,9 @@ var AgentManager = class {
         this.gw.publish("sidebar", { type: "thread.upsert", thread: await this.threads.get(threadId) });
       }
     } else if (meta.provider === "dsh" && !model) {
-      const available = await cachedModels(provider).catch(() => []);
-      const magpie = available.filter((m) => /magpie/i.test(m.id));
-      model = (magpie.find((m) => m.isDefault) ?? magpie[0] ?? available.find((m) => m.isDefault))?.id ?? null;
+      model = await this.resolveDefaultSessionModel("dsh");
     }
+    const sessionModel = model ?? await this.resolveDefaultSessionModel(meta.provider);
     if (opts.updateStatus) await this.setStatus(threadId, "initializing");
     const settings = await this.settings.get();
     const launch = launchFromSettings(settings, meta.provider);
@@ -9277,7 +9815,7 @@ var AgentManager = class {
     rt.session = await provider.createSession({
       threadId,
       cwd: proj.path,
-      model,
+      model: sessionModel,
       mode: clampMode(provider.capabilities.modes, meta.mode),
       effort: meta.effort,
       resumeId: meta.providerSessionId,
@@ -9285,6 +9823,7 @@ var AgentManager = class {
       cursorAutoReview: meta.cursorAutoReview,
       launch
     });
+    rt.syncedDefaultModel = model ? void 0 : sessionModel;
     void this.pumpEvents(threadId, rt.session);
     return rt.session;
   }
@@ -9375,7 +9914,7 @@ init_i18n();
 init_decode();
 import { execFile as execFile5 } from "node:child_process";
 import { existsSync as existsSync11 } from "node:fs";
-import { cp, mkdir as mkdir7, readFile as readFile16, rename as rename4, rm, stat as stat10 } from "node:fs/promises";
+import { cp, mkdir as mkdir7, readFile as readFile16, rename as rename4, rm, stat as stat11 } from "node:fs/promises";
 import { join as join16, normalize as normalize2, sep as sep3 } from "node:path";
 var TIMEOUT2 = 15e3;
 var DIFF_LIMIT = 1024 * 1024;
@@ -9442,7 +9981,7 @@ var GitService = class {
     if (ls.code !== 0) {
       const full = join16(projectPath, rel);
       if (!existsSync11(full)) return { error: tr("fs.fileMissing") };
-      const s = await stat10(full);
+      const s = await stat11(full);
       if (!s.isFile()) return { error: tr("fs.notFile") };
       if (s.size > DIFF_LIMIT) return { tooLarge: true };
       const text = await readFile16(full, "utf8").catch(() => null);
@@ -9490,7 +10029,7 @@ ${lines}` };
 
 // daemon/src/files/service.ts
 init_i18n();
-import { readdir as readdir5, readFile as readFile17, stat as stat11 } from "node:fs/promises";
+import { readdir as readdir5, readFile as readFile17, stat as stat12 } from "node:fs/promises";
 import { join as join17, normalize as normalize3, sep as sep4, extname as extname3 } from "node:path";
 import ignore from "ignore";
 function decodeText(buf) {
@@ -9565,7 +10104,7 @@ var FileService = class {
   igCache = /* @__PURE__ */ new Map();
   async igFor(projectPath) {
     const gi = join17(projectPath, ".gitignore");
-    const st = await stat11(gi).catch(() => null);
+    const st = await stat12(gi).catch(() => null);
     const mtime = st?.isFile() ? st.mtimeMs : -1;
     const hit = this.igCache.get(projectPath);
     if (hit && hit.mtime === mtime) return hit.ig;
@@ -9584,7 +10123,7 @@ var FileService = class {
     const rel = insidePath2(projectPath, dir);
     if (rel === null) return { error: tr("fs.pathDenied") };
     const abs = join17(projectPath, rel);
-    const s = await stat11(abs).catch(() => null);
+    const s = await stat12(abs).catch(() => null);
     if (!s?.isDirectory()) return { error: tr("fs.dirMissing") };
     const ig = await this.igFor(projectPath);
     const dirents = await readdir5(abs, { withFileTypes: true }).catch(() => null);
@@ -9597,7 +10136,7 @@ var FileService = class {
       const childRel = rel === "." ? name : `${rel}/${name}`;
       let isDir2 = d.isDirectory();
       if (d.isSymbolicLink()) {
-        const st = await stat11(join17(projectPath, childRel)).catch(() => null);
+        const st = await stat12(join17(projectPath, childRel)).catch(() => null);
         if (!st) continue;
         isDir2 = st.isDirectory();
       } else if (!d.isFile() && !isDir2) {
@@ -9615,7 +10154,7 @@ var FileService = class {
     const rel = insidePath2(projectPath, p);
     if (rel === null) return { error: tr("fs.pathDenied") };
     const abs = join17(projectPath, rel);
-    const s = await stat11(abs).catch(() => null);
+    const s = await stat12(abs).catch(() => null);
     if (!s) return { error: tr("fs.fileMissing") };
     if (!s.isFile()) return { error: tr("fs.notFile") };
     if (s.size > MAX_READ) return { tooLarge: true };
@@ -9637,7 +10176,7 @@ import { spawn as spawn4, execFileSync as execFileSync2 } from "node:child_proce
 import { accessSync as accessSync2, chmodSync, constants as fsc, existsSync as existsSync12, statSync as statSync7 } from "node:fs";
 import { createRequire as moduleRequire } from "node:module";
 import { release } from "node:os";
-import { dirname as dirname6, join as join18 } from "node:path";
+import { dirname as dirname7, join as join18 } from "node:path";
 var MAX_TERMS_PER_PROJECT = 8;
 var BUF_MAX = 2 * 1024 * 1024;
 var SNAP_LINES = 5e3;
@@ -9680,7 +10219,7 @@ function fixSpawnHelper() {
   if (process.platform !== "darwin") return;
   try {
     const req = moduleRequire(import.meta.url);
-    const root = dirname6(req.resolve("node-pty/package.json"));
+    const root = dirname7(req.resolve("node-pty/package.json"));
     for (const sub of [`prebuilds/darwin-${process.arch}`, "build/Release"]) {
       const f = join18(root, sub, "spawn-helper");
       if (existsSync12(f) && !isExecFile(f)) {
@@ -9935,7 +10474,7 @@ init_proxy();
 // daemon/src/preview/ports.ts
 import { readFileSync as readFileSync2 } from "node:fs";
 import { homedir as homedir10 } from "node:os";
-import { basename as basename5, dirname as dirname7, isAbsolute as isAbsolute3, join as join19 } from "node:path";
+import { basename as basename5, dirname as dirname8, isAbsolute as isAbsolute4, join as join19 } from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 var MAGPIE_DEFAULT_PORTS = [3425, 3430];
 var GATE_DEFAULT_PORT = 3488;
@@ -9954,7 +10493,7 @@ function magpieDirFromInstall(p) {
 function magpieConfigDirs(env = process.env, where = {}) {
   const out = [];
   const add = (d) => {
-    if (d && isAbsolute3(d) && !out.includes(d)) out.push(d);
+    if (d && isAbsolute4(d) && !out.includes(d)) out.push(d);
   };
   let self = where.self;
   if (self === void 0) {
@@ -9966,9 +10505,9 @@ function magpieConfigDirs(env = process.env, where = {}) {
   }
   add(magpieDirFromInstall(self));
   const cwd = where.cwd ?? (env === process.env ? process.cwd() : "");
-  if (cwd && basename5(cwd) === "plugin-work") add(dirname7(cwd));
+  if (cwd && basename5(cwd) === "plugin-work") add(dirname8(cwd));
   const x = env.XDG_CONFIG_HOME;
-  if (x && isAbsolute3(x)) add(join19(x, "magpie"));
+  if (x && isAbsolute4(x)) add(join19(x, "magpie"));
   const platform = where.platform ?? process.platform;
   const home = where.home ?? (env === process.env ? homedir10() : platform === "win32" ? env.USERPROFILE : env.HOME);
   if (home) add(join19(home, ".config", "magpie"));
@@ -10015,7 +10554,7 @@ if (nodeMajor < 20) {
   console.error(`[agent-console] \u9700\u8981 Node.js 20 \u6216\u66F4\u9AD8\u7248\u672C\uFF0C\u5F53\u524D ${process.version}\uFF08${process.execPath}\uFF09`);
   process.exit(3);
 }
-process.env.PATH = augmentPath(process.env, dirname8(process.execPath));
+process.env.PATH = augmentPath(process.env, dirname9(process.execPath));
 var cfg = parseConfig(process.argv.slice(2));
 process.on("uncaughtException", (e) => {
   if (e?.code === "EPIPE") return;
@@ -10029,7 +10568,7 @@ async function main() {
   for (const d of ["threads", "attachments", "trash", "logs"]) {
     mkdirSync2(join21(cfg.dataDir, d), { recursive: true });
   }
-  const appDir = join21(dirname8(fileURLToPath4(import.meta.url)), "..", "..", "app");
+  const appDir = join21(dirname9(fileURLToPath4(import.meta.url)), "..", "..", "app");
   const attachments = new AttachmentStore(join21(cfg.dataDir, "attachments"));
   const { bindAttachmentStore: bindAttachmentStore2 } = await Promise.resolve().then(() => (init_attachmentRefs(), attachmentRefs_exports));
   bindAttachmentStore2(attachments);
@@ -10043,6 +10582,12 @@ async function main() {
     await migrateLegacy2(cfg.dataDir, { settings, projects, threads });
   } catch (e) {
     log("error", "\u65E7\u6570\u636E\u8FC1\u79FB\u5931\u8D25", { err: String(e) });
+  }
+  try {
+    const { migrateAutoApprove13: migrateAutoApprove132 } = await Promise.resolve().then(() => (init_autoApprove13(), autoApprove13_exports));
+    await migrateAutoApprove132({ settings, threads });
+  } catch (e) {
+    log("error", "\u5168\u90E8\u81EA\u52A8\u540C\u610F\u8FC1\u79FB\u5931\u8D25", { err: String(e) });
   }
   const manager = new AgentManager(gateway, threads, projects, settings, attachments);
   await manager.recoverOnStart();
